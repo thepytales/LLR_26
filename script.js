@@ -5,15 +5,28 @@ import { DRACOLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/D
 
 // === 1. Konfiguration ===
 const GLOBAL_SCALE = 0.6; 
-const FURNITURE_HEIGHT = 0.7;
+const FURNITURE_HEIGHT = 0.7; // Angepasst an deine Kalibrierung
 const GRID_SNAP = 0.25;
 
 const ASSETS = {
   rooms: {
-    "raummodell_leer.glb": { data: null, playableArea: { x: 4.4, z: 4.3 } },
-    "raummodell_in_x_gestreckt.glb": { data: null, playableArea: { x: 5.3, z: 4.2 } },
-    "raummodell_in_z_gestreckt.glb": { data: null, playableArea: { x: 4.4, z: 5.1 } },
-    "raummodell_in_x_z_gestreckt.glb": { data: null, playableArea: { x: 5.3, z: 5.1 } },
+    // Hier sind die Werte, die wir zuletzt ermittelt haben
+    "raummodell_leer.glb": { 
+        data: null, 
+        playableArea: { x: 4.4, z: 4.3 } 
+    },
+    "raummodell_in_x_gestreckt.glb": { 
+        data: null, 
+        playableArea: { x: 5.3, z: 4.2 } 
+    },
+    "raummodell_in_z_gestreckt.glb": { 
+        data: null, 
+        playableArea: { x: 4.4, z: 5.1 } 
+    },
+    "raummodell_in_x_z_gestreckt.glb": { 
+        data: null, 
+        playableArea: { x: 5.3, z: 5.1 } 
+    },
   },
   furniture: {
     1: { file: "Tischaufstellung1.glb", data: null, radius: 1.2, seats: 2 }, 
@@ -24,6 +37,7 @@ const ASSETS = {
 
 const PRESETS = {
   rows: [
+    // Engere Reihen
     { id: 2, x: -2.0, z: -2.0, r: 0 }, { id: 2, x: 2.0, z: -2.0, r: 0 },
     { id: 2, x: -2.0, z: 0.0, r: 0 },  { id: 2, x: 2.0, z: 0.0, r: 0 },
     { id: 2, x: -2.0, z: 2.0, r: 0 },  { id: 2, x: 2.0, z: 2.0, r: 0 },
@@ -39,6 +53,7 @@ const PRESETS = {
 // === 2. Globale Variablen ===
 let scene, camera, renderer, controls;
 let currentRoomMesh = null;
+let roomBoundaryBox = null;
 let currentRoomLimits = { x: 5, z: 5 }; 
 let movableObjects = [];
 let interactionMeshes = [];
@@ -55,7 +70,7 @@ let isDragging = false;
 // === 3. Initialisierung ===
 function init() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x111111); // Fast Schwarz im Hintergrund
+  scene.background = new THREE.Color(0x202226); 
 
   // Setup Kamera
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -70,26 +85,24 @@ function init() {
   document.body.appendChild(renderer.domElement);
 
   // Licht
-  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
   scene.add(hemiLight);
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
-  dirLight.position.set(5, 12, 5);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  dirLight.position.set(8, 15, 8);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
   dirLight.shadow.mapSize.height = 2048;
-  dirLight.shadow.radius = 3;
+  dirLight.shadow.radius = 4;
   scene.add(dirLight);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.4);
-  fill.position.set(-5, 8, -5);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.3);
+  fill.position.set(-5, 5, -5);
   scene.add(fill);
 
-  // === BODEN (Dunkel & Grid) ===
+  // Boden
   const floorGeo = new THREE.PlaneGeometry(40, 40);
-  const floorTex = createDarkFloorTexture(); // Neue Funktion
+  const floorTex = createDarkFloorTexture();
   const floorMat = new THREE.MeshStandardMaterial({ 
-      map: floorTex, 
-      roughness: 0.9,
-      color: 0xffffff // Farbe kommt aus Textur
+      map: floorTex, roughness: 0.8, color: 0xffffff 
   });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
@@ -118,62 +131,45 @@ function init() {
   selectionBox.visible = false;
   scene.add(selectionBox);
 
+  // Room Boundary
+  roomBoundaryBox = new THREE.BoxHelper(new THREE.Mesh(), 0x000000);
+  roomBoundaryBox.material.opacity = 0.2;
+  roomBoundaryBox.material.transparent = true;
+  roomBoundaryBox.visible = true; 
+  scene.add(roomBoundaryBox);
+
+  // Start
   loadAllAssets().then(() => {
     const loaderEl = document.getElementById("loader");
     if(loaderEl) {
         loaderEl.style.opacity = 0;
         setTimeout(() => loaderEl.remove(), 500);
     }
+    // Ersten Raum laden
     switchRoom("raummodell_leer.glb");
     animate();
   });
 }
 
-// === Textur-Generator (Dunkler Boden) ===
 function createDarkFloorTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 1024; canvas.height = 1024;
     const ctx = canvas.getContext('2d');
-    
-    // Hintergrund: Dunkles Grau
-    ctx.fillStyle = '#222222'; 
-    ctx.fillRect(0, 0, 1024, 1024);
-    
-    // Grid: Etwas helleres Grau
-    ctx.strokeStyle = '#333333';
-    ctx.lineWidth = 3;
-    
-    const tiles = 8; 
-    const step = 1024 / tiles;
-    
+    ctx.fillStyle = '#222222'; ctx.fillRect(0, 0, 1024, 1024);
+    ctx.strokeStyle = '#333333'; ctx.lineWidth = 3;
+    const tiles = 8; const step = 1024 / tiles;
     for(let i=0; i<=tiles; i++) {
         const p = i * step;
-        // Vertikal
-        ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, 1024); ctx.stroke();
-        // Horizontal
-        ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(1024, p); ctx.stroke();
-    }
-    
-    // Sub-Grid (feiner)
-    ctx.strokeStyle = '#2a2a2a';
-    ctx.lineWidth = 1;
-    const subTiles = 32;
-    const subStep = 1024 / subTiles;
-    for(let i=0; i<=subTiles; i++) {
-        const p = i * subStep;
-        if(i % 4 === 0) continue; // Hauptlinien nicht überschreiben
         ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, 1024); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(1024, p); ctx.stroke();
     }
-
     const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
+    tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(6, 6);
     return tex;
 }
 
-// === 4. Assets ===
+// === 4. Assets Loader (Mit Cache Buster) ===
 async function loadAllAssets() {
   const loader = new GLTFLoader();
   const draco = new DRACOLoader();
@@ -183,10 +179,14 @@ async function loadAllAssets() {
   const path = "models/";
   const promises = [];
   const loadingText = document.getElementById("loading-text");
+  
+  // Cache Buster Timestamp, damit Browser neue Modelle lädt
+  const ts = "?t=" + Date.now();
 
   const loadFile = (filename, targetObj) => {
     return new Promise((resolve) => {
-      loader.load(path + filename, (gltf) => {
+      console.log("Lade Modell:", filename);
+      loader.load(path + filename + ts, (gltf) => {
           gltf.scene.scale.set(GLOBAL_SCALE, GLOBAL_SCALE, GLOBAL_SCALE);
           targetObj.data = gltf.scene;
           resolve(); 
@@ -194,7 +194,10 @@ async function loadAllAssets() {
         (xhr) => {
            if(loadingText && xhr.total) loadingText.innerText = `Lade... ${Math.round(xhr.loaded/xhr.total*100)}%`;
         },
-        (error) => { console.error(error); resolve(); }
+        (error) => { 
+            console.error("Fehler beim Laden von:", filename, error); 
+            resolve(); 
+        }
       );
     });
   };
@@ -207,20 +210,45 @@ async function loadAllAssets() {
 
 // === 5. Raum Logik ===
 function switchRoom(filename) {
+  console.log("Versuche Raumwechsel zu:", filename);
+
+  const roomInfo = ASSETS.rooms[filename];
+  if (!roomInfo) {
+      console.error("Raum nicht in ASSETS gefunden:", filename);
+      return;
+  }
+  if (!roomInfo.data) {
+      console.error("Raumdaten sind leer (nicht geladen):", filename);
+      alert("Fehler: Raummodell konnte nicht geladen werden. Bitte Dateinamen prüfen.");
+      return;
+  }
+
+  // Alten Raum entfernen
   if (currentRoomMesh) scene.remove(currentRoomMesh);
   window.app.clearRoom();
 
-  const roomInfo = ASSETS.rooms[filename];
-  if (!roomInfo || !roomInfo.data) return;
-
+  // Neuen Raum klonen
   currentRoomMesh = roomInfo.data.clone();
   
+  // Auto-Zentrierung
   const box = new THREE.Box3().setFromObject(currentRoomMesh);
   const center = box.getCenter(new THREE.Vector3());
   const offsetY = -box.min.y; 
 
   currentRoomMesh.position.set(-center.x, offsetY, -center.z);
+  
+  // Grenzen setzen
   currentRoomLimits = roomInfo.playableArea;
+  console.log("Neue Raumgrenzen (Playable):", currentRoomLimits);
+
+  // Debug Box updaten
+  const debugMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(currentRoomLimits.x * 2, 0.1, currentRoomLimits.z * 2),
+      new THREE.MeshBasicMaterial()
+  );
+  debugMesh.position.set(0, 0.05, 0); 
+  roomBoundaryBox.setFromObject(debugMesh);
+  roomBoundaryBox.update();
 
   currentRoomMesh.traverse((child) => {
     if (child.isMesh) {
@@ -245,7 +273,8 @@ function updateSeatCount() {
             total += (ASSETS.furniture[id].seats || 0);
         }
     });
-    document.getElementById("seat-count").innerText = total;
+    const el = document.getElementById("seat-count");
+    if(el) el.innerText = total;
 }
 
 window.app.toggleUI = function() {
@@ -278,6 +307,7 @@ function createFurniture(typeId, x, z, rotY) {
   hitbox.userData = { root: group, typeId: typeId };
   group.add(hitbox);
 
+  // Feste Höhe
   group.position.set(x, FURNITURE_HEIGHT, z);
   group.rotation.y = rotY;
 
@@ -346,15 +376,13 @@ window.app.enterPOV = function() {
 // === 7. Interaktion ===
 function setEmissive(obj, color) {
     obj.traverse((c) => {
-        if(c.isMesh && c.material) {
-            if(c.material.emissive) {
-                if(color) {
-                    if(!c.userData.origEmissive) c.userData.origEmissive = c.material.emissive.clone();
-                    c.material.emissive.setHex(color);
-                } else {
-                    if(c.userData.origEmissive) c.material.emissive.copy(c.userData.origEmissive);
-                    else c.material.emissive.setHex(0x000000);
-                }
+        if(c.isMesh && c.material && c.material.emissive) {
+            if(color) {
+                if(!c.userData.origEmissive) c.userData.origEmissive = c.material.emissive.clone();
+                c.material.emissive.setHex(color);
+            } else {
+                if(c.userData.origEmissive) c.material.emissive.copy(c.userData.origEmissive);
+                else c.material.emissive.setHex(0x000000);
             }
         }
     });
@@ -395,9 +423,7 @@ function checkCollision(targetPos, activeObj) {
     return false;
 }
 
-function snap(val) {
-    return Math.round(val / GRID_SNAP) * GRID_SNAP;
-}
+function snap(val) { return Math.round(val / GRID_SNAP) * GRID_SNAP; }
 
 function onMouseMove(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -408,7 +434,6 @@ function onMouseMove(event) {
       const planeIntersect = new THREE.Vector3();
       if (raycaster.ray.intersectPlane(dragPlane, planeIntersect)) {
         const rawPos = planeIntersect.sub(dragOffset);
-        
         let newX = snap(rawPos.x);
         let newZ = snap(rawPos.z);
 
@@ -459,11 +484,7 @@ function onMouseUp() {
 }
 
 function onKeyDown(event) {
-  // ESC zum Einblenden der UI
-  if (event.key === "Escape") {
-      document.getElementById("ui-container").classList.remove("hidden");
-  }
-
+  if (event.key === "Escape") document.getElementById("ui-container").classList.remove("hidden");
   if (!selectedRoot) return;
   const key = event.key.toLowerCase();
   if (key === "r") { 
