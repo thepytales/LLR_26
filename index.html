@@ -7,8 +7,7 @@
     <style>
       :root { 
         --primary: #00e5ff; 
-        --glass: rgba(20, 20, 25, 0.95); 
-        --glass-light: rgba(40, 40, 45, 0.95);
+        --glass: rgba(25, 25, 30, 0.95); 
         --text: #f0f0f0;
         --danger: #ff5252;
       }
@@ -16,13 +15,13 @@
       body { 
         margin: 0; overflow: hidden; 
         font-family: "Segoe UI", Roboto, sans-serif; 
-        color: var(--text); background: #000; 
-        user-select: none; 
+        color: var(--text); background: #1a1a1a; 
+        user-select: none;
       }
       
       canvas { display: block; width: 100vw; height: 100vh; outline: none; }
       
-      /* === UI Container === */
+      /* UI Container */
       #ui-container { 
         position: absolute; inset: 0; pointer-events: none; 
         display: flex; flex-direction: column; justify-content: space-between;
@@ -30,98 +29,89 @@
       }
       #ui-container.hidden { opacity: 0; pointer-events: none; }
 
-      /* === Top Bar === */
+      /* Top Bar */
       .top-bar {
         background: var(--glass); padding: 10px 20px; 
-        display: flex; align-items: center; gap: 10px;
+        display: flex; align-items: center; gap: 12px;
         pointer-events: auto; border-bottom: 1px solid #444; 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        flex-wrap: wrap;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
       }
       
-      .app-title { font-weight:bold; color:var(--primary); margin-right:5px; white-space: nowrap; }
+      .logo { font-weight:bold; color:var(--primary); margin-right:10px; }
 
       select { 
-        padding: 8px 10px; border-radius: 6px; 
+        padding: 8px 12px; border-radius: 6px; 
         background: #333; color: white; border: 1px solid #555; 
         cursor: pointer; font-size: 0.9rem; outline: none;
       }
+      select:hover { border-color: var(--primary); }
       
       .separator { width: 1px; height: 24px; background: #555; margin: 0 5px; }
       
-      /* === Stats Panel === */
+      /* Stats Panel (Rechts) */
       .stats-panel {
-        margin-left: auto; /* Schiebt alles nach rechts */
-        display: flex; align-items: center; gap: 15px;
+        margin-left: auto; display: flex; align-items: center; gap: 15px;
       }
       .seat-counter {
-        background: rgba(0, 229, 255, 0.1); border: 1px solid var(--primary);
-        padding: 6px 12px; border-radius: 6px; font-weight: bold; color: var(--primary);
-        white-space: nowrap; font-size: 0.9rem;
+        background: rgba(0, 229, 255, 0.15); border: 1px solid var(--primary);
+        padding: 5px 12px; border-radius: 4px; font-weight: bold; color: var(--primary);
+        font-size: 0.9rem;
       }
 
-      /* === Sidebar (Presets) === */
+      /* Sidebar (Links) */
       .preset-bar {
         position: absolute; top: 80px; left: 20px; 
         background: var(--glass); padding: 15px;
         border-radius: 12px; pointer-events: auto; 
         display: flex; flex-direction: column; gap: 8px;
         border: 1px solid #444; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        width: 160px;
+        width: 150px;
       }
       .preset-title { 
-        font-size: 0.7rem; color: #888; margin-bottom: 2px; 
+        font-size: 0.75rem; color: #888; margin-bottom: 5px; 
         font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
       }
 
-      /* === Context Menu (Ausgewählt) === */
+      /* Context Menu (Unten Mitte bei Auswahl) */
       #selection-context {
         position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
-        background: var(--glass-light); padding: 10px 20px; border-radius: 12px;
+        background: var(--glass); padding: 10px 20px; border-radius: 50px;
         display: flex; gap: 10px; align-items: center;
         border: 1px solid var(--primary);
-        box-shadow: 0 5px 30px rgba(0,0,0,0.7);
+        box-shadow: 0 5px 30px rgba(0,0,0,0.6);
         opacity: 0; pointer-events: none; transition: all 0.2s ease;
-        transform: translateX(-50%) translateY(20px); z-index: 10;
+        transform: translateX(-50%) translateY(20px);
       }
       #selection-context.visible {
         opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0);
       }
 
-      /* === Bottom Bar === */
+      /* Bottom Bar */
       .bottom-bar {
         background: var(--glass); padding: 15px; 
         display: flex; justify-content: center; gap: 15px;
         pointer-events: auto; border-top: 1px solid #444;
       }
 
-      /* === Buttons === */
+      /* Buttons */
       button {
         background: #3a3a3a; color: white; border: 1px solid #555; 
         padding: 8px 14px; border-radius: 6px;
         cursor: pointer; transition: all 0.2s; 
         display: flex; align-items: center; gap: 6px; font-size: 0.9rem;
-        white-space: nowrap;
       }
       button:hover { background: #505050; border-color: #999; }
       button:active { transform: translateY(1px); }
 
-      /* Spezielle Buttons */
+      button.icon-btn { padding: 8px 10px; }
+      
       button.preset-btn { 
         width: 100%; justify-content: flex-start; background: transparent; border-color: transparent;
       }
       button.preset-btn:hover { background: rgba(255,255,255,0.1); }
 
-      button.rotate-btn { background: rgba(255,255,255,0.1); border-color: #666; padding: 8px 10px; }
-      
-      button.delete-btn { background: rgba(255, 82, 82, 0.15); border-color: var(--danger); color: var(--danger); }
+      button.delete-btn { background: rgba(255, 82, 82, 0.2); border-color: var(--danger); color: var(--danger); }
       button.delete-btn:hover { background: var(--danger); color: white; }
-
-      /* Toggle Button im Top-Menu */
-      button.toggle-btn {
-        background: transparent; border: 1px solid #555; color: #aaa;
-      }
-      button.toggle-btn:hover { color: white; border-color: white; }
 
       /* Loader */
       #loader {
@@ -139,17 +129,13 @@
     
     <div id="loader">
       <div class="spinner"></div>
-      <div id="loading-text" style="color:#888;">Lade Raumplaner...</div>
+      <div id="loading-text" style="color:#888;">Lade 3D Modelle...</div>
     </div>
-
-    <!-- Einziger Button der immer sichtbar bleibt wenn UI weg ist (optional, aktuell im Menü integriert) -->
-    <!-- Wenn UI hidden ist, muss man ESC drücken oder einen unsichtbaren Bereich klicken, oder wir lassen einen Button da. 
-         Ich habe den Button jetzt in die TopBar integriert. Um UI wieder einzublenden, füge ich einen Listener auf "ESC" hinzu. -->
 
     <div id="ui-container">
       <!-- Oben -->
       <div class="top-bar">
-        <div class="app-title">LLR 3D</div>
+        <div class="logo">LLR 3D</div>
         <select id="room-select">
           <option value="raummodell_leer.glb" selected>LLR Standard (~75 m²)</option>
           <option value="raummodell_in_x_gestreckt.glb">Raum Breit (~90 m²)</option>
@@ -158,21 +144,16 @@
         </select>
         
         <div class="separator"></div>
-        
-        <!-- Kamera Buttons mit Text -->
-        <button onclick="app.setCamera('standard')">🏠 Kamera zurücksetzen </button>
-        <button onclick="app.setCamera('top')">🦅 Draufsicht </button>
-        <button onclick="app.setCamera('corner')">📐 Eckansicht </button>
-        <button onclick="app.takeScreenshot()">📸 Bild erstellen</button>
+        <button class="icon-btn" onclick="app.setCamera('standard')">🏠 Kamera zurücksetzen</button>
+        <button class="icon-btn" onclick="app.setCamera('top')">🦅 Draufsicht</button>
+        <button class="icon-btn" onclick="app.setCamera('corner')">📐 Eckansicht</button>
+        <button class="icon-btn" onclick="app.takeScreenshot()">📸 Bild erstellen</button>
 
-        <!-- Stats & Toggle (Rechtsbündig) -->
         <div class="stats-panel">
           <div class="seat-counter">
             🪑 <span id="seat-count">0</span> Plätze
           </div>
-          <button class="toggle-btn" onclick="app.toggleUI()" title="Interface ausblenden (ESC zum Einblenden)">
-            👁️
-          </button>
+          <button class="icon-btn" onclick="app.toggleUI()" title="UI Ausblenden">👁️</button>
         </div>
       </div>
 
@@ -185,17 +166,16 @@
         <button class="preset-btn danger" onclick="app.clearRoom()">❌ Leeren</button>
       </div>
 
-      <!-- Mitte Unten (Kontext Menü für Auswahl) -->
+      <!-- Kontext Menü (Erscheint bei Auswahl) -->
       <div id="selection-context">
-        <span style="color:#aaa; font-size:0.8rem; margin-right:5px; font-weight:bold;">AUSWAHL</span>
-        <button class="rotate-btn" onclick="app.rotateSelection(1)">⟲ Links</button>
-        <button class="rotate-btn" onclick="app.rotateSelection(-1)">Rechts ⟳</button>
-        <button id="btn-pov" onclick="app.enterPOV()">👁️ Sitzplatz</button>
+        <button onclick="app.rotateSelection(1)">⟲ Links</button>
+        <button onclick="app.rotateSelection(-1)">Rechts ⟳</button>
+        <button onclick="app.enterPOV()">👁️ Ansicht</button>
         <div class="separator"></div>
-        <button class="delete-btn" onclick="app.deleteSelection()">🗑️ Entfernen</button>
+        <button class="delete-btn" onclick="app.deleteSelection()">🗑️ Löschen</button>
       </div>
 
-      <!-- Unten (Möbel hinzufügen) -->
+      <!-- Unten (Möbel) -->
       <div class="bottom-bar">
         <button onclick="app.addFurniture(1)">🪑 Ecktisch (2)</button>
         <button onclick="app.addFurniture(2)">🪑 Paartisch (2)</button>

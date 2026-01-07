@@ -5,12 +5,11 @@ import { DRACOLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/D
 
 // === 1. Konfiguration ===
 const GLOBAL_SCALE = 0.6; 
-const FURNITURE_HEIGHT = 0.7; // Angepasst an deine Kalibrierung
-const GRID_SNAP = 0.25;
+const FURNITURE_HEIGHT = 0.7; // Feste Höhe gegen Boden-Clipping
+const GRID_SNAP = 0.25; // Einrasten in 25cm Schritten
 
 const ASSETS = {
   rooms: {
-    // Hier sind die Werte, die wir zuletzt ermittelt haben
     "raummodell_leer.glb": { 
         data: null, 
         playableArea: { x: 4.4, z: 4.3 } 
@@ -29,15 +28,16 @@ const ASSETS = {
     },
   },
   furniture: {
+    // seats auf 2 geändert für Gruppe 2, da nun "Paartisch"
     1: { file: "Tischaufstellung1.glb", data: null, radius: 1.2, seats: 2 }, 
-    2: { file: "Tischaufstellung2.glb", data: null, radius: 1.5, seats: 4 },
+    2: { file: "Tischaufstellung2.glb", data: null, radius: 1.5, seats: 2 },
     3: { file: "Tischaufstellung3.glb", data: null, radius: 1.9, seats: 8 },
   },
 };
 
 const PRESETS = {
   rows: [
-    // Engere Reihen
+    // Reihen enger zusammen
     { id: 2, x: -2.0, z: -2.0, r: 0 }, { id: 2, x: 2.0, z: -2.0, r: 0 },
     { id: 2, x: -2.0, z: 0.0, r: 0 },  { id: 2, x: 2.0, z: 0.0, r: 0 },
     { id: 2, x: -2.0, z: 2.0, r: 0 },  { id: 2, x: 2.0, z: 2.0, r: 0 },
@@ -59,7 +59,7 @@ let movableObjects = [];
 let interactionMeshes = [];
 let selectedRoot = null;
 let selectionBox = null; 
-let hoveredRoot = null; 
+let hoveredRoot = null; // Für Hover-Effekt
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -70,13 +70,13 @@ let isDragging = false;
 // === 3. Initialisierung ===
 function init() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x202226); 
+  scene.background = new THREE.Color(0x202226); // Modernes Dunkelgrau
 
-  // Setup Kamera
+  // Kamera
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.set(8, 12, 12);
 
-  // Setup Renderer
+  // Renderer
   renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
@@ -92,23 +92,22 @@ function init() {
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
   dirLight.shadow.mapSize.height = 2048;
-  dirLight.shadow.radius = 4;
+  dirLight.shadow.radius = 3;
   scene.add(dirLight);
   const fill = new THREE.DirectionalLight(0xffffff, 0.3);
-  fill.position.set(-5, 5, -5);
+  fill.position.set(-5, 8, -5);
   scene.add(fill);
 
-  // Boden
-  const floorGeo = new THREE.PlaneGeometry(40, 40);
-  const floorTex = createDarkFloorTexture();
-  const floorMat = new THREE.MeshStandardMaterial({ 
-      map: floorTex, roughness: 0.8, color: 0xffffff 
-  });
-  const floor = new THREE.Mesh(floorGeo, floorMat);
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -0.01;
-  floor.receiveShadow = true;
-  scene.add(floor);
+  // Boden mit Raster
+  const gridHelper = new THREE.GridHelper(30, 30, 0x555555, 0x333333);
+  gridHelper.position.y = 0.01;
+  scene.add(gridHelper);
+  
+  // Dunkler Boden darunter
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(60,60), new THREE.MeshStandardMaterial({color:0x222222, roughness:0.8}));
+  plane.rotation.x = -Math.PI/2;
+  plane.receiveShadow = true;
+  scene.add(plane);
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -123,53 +122,36 @@ function init() {
   window.addEventListener("mouseup", onMouseUp);
   window.addEventListener("keydown", onKeyDown);
   
-  // Selection Box
-  selectionBox = new THREE.BoxHelper(new THREE.Mesh(), 0x00e5ff);
+  // UI Bindings (Wichtig!)
+  document.getElementById("room-select").addEventListener("change", (e) => switchRoom(e.target.value));
+  
+  // Auswahl-Box
+  selectionBox = new THREE.BoxHelper(new THREE.Mesh(), 0x00e5ff); // Cyan
   selectionBox.material.depthTest = false;
   selectionBox.material.transparent = true;
   selectionBox.material.opacity = 0.8;
   selectionBox.visible = false;
   scene.add(selectionBox);
 
-  // Room Boundary
+  // Grenzen (Dezent)
   roomBoundaryBox = new THREE.BoxHelper(new THREE.Mesh(), 0x000000);
-  roomBoundaryBox.material.opacity = 0.2;
+  roomBoundaryBox.material.opacity = 0.1;
   roomBoundaryBox.material.transparent = true;
   roomBoundaryBox.visible = true; 
   scene.add(roomBoundaryBox);
 
-  // Start
   loadAllAssets().then(() => {
     const loaderEl = document.getElementById("loader");
     if(loaderEl) {
         loaderEl.style.opacity = 0;
         setTimeout(() => loaderEl.remove(), 500);
     }
-    // Ersten Raum laden
     switchRoom("raummodell_leer.glb");
     animate();
   });
 }
 
-function createDarkFloorTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024; canvas.height = 1024;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#222222'; ctx.fillRect(0, 0, 1024, 1024);
-    ctx.strokeStyle = '#333333'; ctx.lineWidth = 3;
-    const tiles = 8; const step = 1024 / tiles;
-    for(let i=0; i<=tiles; i++) {
-        const p = i * step;
-        ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, 1024); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(1024, p); ctx.stroke();
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(6, 6);
-    return tex;
-}
-
-// === 4. Assets Loader (Mit Cache Buster) ===
+// === 4. Asset Loader ===
 async function loadAllAssets() {
   const loader = new GLTFLoader();
   const draco = new DRACOLoader();
@@ -180,12 +162,11 @@ async function loadAllAssets() {
   const promises = [];
   const loadingText = document.getElementById("loading-text");
   
-  // Cache Buster Timestamp, damit Browser neue Modelle lädt
+  // Cache Buster
   const ts = "?t=" + Date.now();
 
   const loadFile = (filename, targetObj) => {
     return new Promise((resolve) => {
-      console.log("Lade Modell:", filename);
       loader.load(path + filename + ts, (gltf) => {
           gltf.scene.scale.set(GLOBAL_SCALE, GLOBAL_SCALE, GLOBAL_SCALE);
           targetObj.data = gltf.scene;
@@ -195,8 +176,8 @@ async function loadAllAssets() {
            if(loadingText && xhr.total) loadingText.innerText = `Lade... ${Math.round(xhr.loaded/xhr.total*100)}%`;
         },
         (error) => { 
-            console.error("Fehler beim Laden von:", filename, error); 
-            resolve(); 
+            console.error("Fehler beim Laden:", filename, error); 
+            resolve(); // Trotzdem weitermachen
         }
       );
     });
@@ -210,24 +191,15 @@ async function loadAllAssets() {
 
 // === 5. Raum Logik ===
 function switchRoom(filename) {
-  console.log("Versuche Raumwechsel zu:", filename);
-
   const roomInfo = ASSETS.rooms[filename];
-  if (!roomInfo) {
-      console.error("Raum nicht in ASSETS gefunden:", filename);
-      return;
-  }
-  if (!roomInfo.data) {
-      console.error("Raumdaten sind leer (nicht geladen):", filename);
-      alert("Fehler: Raummodell konnte nicht geladen werden. Bitte Dateinamen prüfen.");
+  if (!roomInfo || !roomInfo.data) {
+      console.warn("Raum nicht geladen:", filename);
       return;
   }
 
-  // Alten Raum entfernen
   if (currentRoomMesh) scene.remove(currentRoomMesh);
   window.app.clearRoom();
 
-  // Neuen Raum klonen
   currentRoomMesh = roomInfo.data.clone();
   
   // Auto-Zentrierung
@@ -239,9 +211,8 @@ function switchRoom(filename) {
   
   // Grenzen setzen
   currentRoomLimits = roomInfo.playableArea;
-  console.log("Neue Raumgrenzen (Playable):", currentRoomLimits);
 
-  // Debug Box updaten
+  // Grenze visualisieren
   const debugMesh = new THREE.Mesh(
       new THREE.BoxGeometry(currentRoomLimits.x * 2, 0.1, currentRoomLimits.z * 2),
       new THREE.MeshBasicMaterial()
@@ -273,8 +244,7 @@ function updateSeatCount() {
             total += (ASSETS.furniture[id].seats || 0);
         }
     });
-    const el = document.getElementById("seat-count");
-    if(el) el.innerText = total;
+    document.getElementById("seat-count").innerText = total;
 }
 
 window.app.toggleUI = function() {
@@ -307,7 +277,6 @@ function createFurniture(typeId, x, z, rotY) {
   hitbox.userData = { root: group, typeId: typeId };
   group.add(hitbox);
 
-  // Feste Höhe
   group.position.set(x, FURNITURE_HEIGHT, z);
   group.rotation.y = rotY;
 
