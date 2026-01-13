@@ -1,65 +1,51 @@
 import * as THREE from "https://esm.sh/three@0.160.0";
 import { OrbitControls } from "https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+import { OBJLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/OBJLoader.js";
 import { DRACOLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/DRACOLoader.js";
 
 // === 1. Konfiguration ===
 const GLOBAL_SCALE = 0.6; 
-const FURNITURE_HEIGHT = 0.7; // Feste Höhe gegen Boden-Clipping
-const GRID_SNAP = 0.25; // Einrasten in 25cm Schritten
+const HITBOX_PADDING = 0.3; 
+const FURNITURE_Y_OFFSET = 0.02; 
 
 const ASSETS = {
   rooms: {
-    "raummodell_leer.glb": { 
-        data: null, 
-        playableArea: { x: 4.4, z: 4.3 } 
-    },
-    "raummodell_in_x_gestreckt.glb": { 
-        data: null, 
-        playableArea: { x: 5.3, z: 4.2 } 
-    },
-    "raummodell_in_z_gestreckt.glb": { 
-        data: null, 
-        playableArea: { x: 4.4, z: 5.1 } 
-    },
-    "raummodell_in_x_z_gestreckt.glb": { 
-        data: null, 
-        playableArea: { x: 5.3, z: 5.1 } 
-    },
+    "raummodell_leer.glb":    { data: null, playableArea: { x: 4.4, z: 4.3 } },
+    "LLR_möbliert(50qm).obj": { data: null, playableArea: { x: 4.5, z: 4.5 }, type: 'obj' },
+    "leer_70qm.glb":          { data: null, playableArea: { x: 5.5, z: 5.5 } },
+    "leer_30qm.glb":          { data: null, playableArea: { x: 3.5, z: 3.5 } },
   },
   furniture: {
-    // seats auf 2 geändert für Gruppe 2, da nun "Paartisch"
-    1: { file: "Tischaufstellung1.glb", data: null, radius: 1.2, seats: 2 }, 
-    2: { file: "Tischaufstellung2.glb", data: null, radius: 1.5, seats: 2 },
-    3: { file: "Tischaufstellung3.glb", data: null, radius: 1.9, seats: 8 },
+    'row_combo': { file: 'Tischplusstuhleinzeln.glb', radius: 0.8, seats: 1, width: 1.2, depth: 1.0 },
+    'tano':      { file: 'trapezTisch.glb', radius: 0.5, seats: 1, width: 1.0, depth: 0.6 },
+    'triangle':  { file: 'dreiecksTisch.glb', radius: 0.5, seats: 1 },
+    'chair':     { file: 'roterStuhl.glb', radius: 0.35, seats: 1 },
+    
+    'teacher':   { file: 'Lehrertisch.glb', radius: 1.0, seats: 0 },
+    'cupboard':  { file: 'runderSchrank.glb', radius: 0.8, seats: 0 },
+    'board':     { file: 'tafel_skaliert.glb', radius: 0.5, seats: 0, isWallItem: true },
+
+    'k1': { file: 'Tischaufstellung1.glb', radius: 1.0, seats: 2 }, 
+    'k2': { file: 'Tischaufstellung2.glb', radius: 1.2, seats: 2 },
+    'k3': { file: 'Tischaufstellung3.glb', radius: 1.8, seats: 8 },
+    'k4': { file: 'Tischkonstellation4.glb', radius: 1.8, seats: 8 },
+    'k5': { file: 'Tischkonstellation5.glb', radius: 1.4, seats: 4 },
+    'k6': { file: 'Tischkonstellation6.glb', radius: 1.8, seats: 6 }, 
+    'k7': { file: 'Tischkonstellation7.glb', radius: 2.2, seats: 11 },
+    'k8': { file: 'Tischkonstellation8.glb', radius: 2.0, seats: 9 },
   },
 };
 
-const PRESETS = {
-  rows: [
-    // Reihen enger zusammen
-    { id: 2, x: -2.0, z: -2.0, r: 0 }, { id: 2, x: 2.0, z: -2.0, r: 0 },
-    { id: 2, x: -2.0, z: 0.0, r: 0 },  { id: 2, x: 2.0, z: 0.0, r: 0 },
-    { id: 2, x: -2.0, z: 2.0, r: 0 },  { id: 2, x: 2.0, z: 2.0, r: 0 },
-  ],
-  groups: [
-    { id: 3, x: -2.2, z: -2.2, r: Math.PI/4 },
-    { id: 3, x: 2.2, z: -2.2, r: -Math.PI/4 },
-    { id: 3, x: -2.2, z: 2.2, r: -Math.PI/4 },
-    { id: 3, x: 2.2, z: 2.2, r: Math.PI/4 },
-  ]
-};
-
-// === 2. Globale Variablen ===
 let scene, camera, renderer, controls;
 let currentRoomMesh = null;
-let roomBoundaryBox = null;
+let currentRoomFile = ""; 
 let currentRoomLimits = { x: 5, z: 5 }; 
 let movableObjects = [];
 let interactionMeshes = [];
 let selectedRoot = null;
 let selectionBox = null; 
-let hoveredRoot = null; // Für Hover-Effekt
+let hoveredRoot = null; 
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -67,47 +53,42 @@ const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const dragOffset = new THREE.Vector3();
 let isDragging = false;
 
+const gltfLoader = new GLTFLoader();
+const objLoader = new OBJLoader();
+const draco = new DRACOLoader();
+draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+gltfLoader.setDRACOLoader(draco);
+
 // === 3. Initialisierung ===
 function init() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x202226); // Modernes Dunkelgrau
+  scene.background = new THREE.Color(0x1e1e1e); 
 
-  // Kamera
-  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  // Kamera Near Plane auf 0.01 setzen (verhindert Abschneiden bei Zoom)
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 100);
   camera.position.set(8, 12, 12);
 
-  // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: "default" });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = true; // LIVE SCHATTEN
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   document.body.appendChild(renderer.domElement);
 
-  // Licht
-  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
   scene.add(hemiLight);
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-  dirLight.position.set(8, 15, 8);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(5, 15, 5);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
-  dirLight.shadow.radius = 3;
+  dirLight.shadow.mapSize.width = 1024; 
+  dirLight.shadow.mapSize.height = 1024;
+  dirLight.shadow.bias = -0.0001;
   scene.add(dirLight);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.3);
-  fill.position.set(-5, 8, -5);
-  scene.add(fill);
 
-  // Boden mit Raster
-  const gridHelper = new THREE.GridHelper(30, 30, 0x555555, 0x333333);
-  gridHelper.position.y = 0.01;
+  const gridHelper = new THREE.GridHelper(30, 30, 0x444444, 0x333333);
+  gridHelper.position.y = -0.05;
   scene.add(gridHelper);
-  
-  // Dunkler Boden darunter
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(60,60), new THREE.MeshStandardMaterial({color:0x222222, roughness:0.8}));
-  plane.rotation.x = -Math.PI/2;
-  plane.receiveShadow = true;
-  scene.add(plane);
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -122,135 +103,304 @@ function init() {
   window.addEventListener("mouseup", onMouseUp);
   window.addEventListener("keydown", onKeyDown);
   
-  // UI Bindings (Wichtig!)
-  document.getElementById("room-select").addEventListener("change", (e) => switchRoom(e.target.value));
-  
-  // Auswahl-Box
-  selectionBox = new THREE.BoxHelper(new THREE.Mesh(), 0x00e5ff); // Cyan
-  selectionBox.material.depthTest = false;
-  selectionBox.material.transparent = true;
-  selectionBox.material.opacity = 0.8;
+  selectionBox = new THREE.BoxHelper(new THREE.Mesh(), 0x007acc); 
   selectionBox.visible = false;
   scene.add(selectionBox);
 
-  // Grenzen (Dezent)
-  roomBoundaryBox = new THREE.BoxHelper(new THREE.Mesh(), 0x000000);
-  roomBoundaryBox.material.opacity = 0.1;
-  roomBoundaryBox.material.transparent = true;
-  roomBoundaryBox.visible = true; 
-  scene.add(roomBoundaryBox);
-
-  loadAllAssets().then(() => {
-    const loaderEl = document.getElementById("loader");
-    if(loaderEl) {
-        loaderEl.style.opacity = 0;
-        setTimeout(() => loaderEl.remove(), 500);
-    }
-    switchRoom("raummodell_leer.glb");
-    animate();
+  toggleLoader(true, "Lade Raum...");
+  
+  // Nur Raum laden beim Start
+  loadRoomAsset("raummodell_leer.glb").then((model) => {
+      setupRoom(model, "raummodell_leer.glb");
+      toggleLoader(false);
+      
+      // Background Loading für Möbel, damit sie beim ersten Klick schneller da sind
+      loadFurnitureBackground();
+      
+      animate();
+      const sel = document.getElementById('room-select');
+      if(sel) sel.addEventListener('change', (e) => app.switchRoom(e.target.value));
   });
 }
 
-// === 4. Asset Loader ===
-async function loadAllAssets() {
-  const loader = new GLTFLoader();
-  const draco = new DRACOLoader();
-  draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-  loader.setDRACOLoader(draco);
+// === 4. Lazy & Background Loader ===
+async function loadFurnitureBackground() {
+  const keys = Object.keys(ASSETS.furniture);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    // Langsam nacheinander laden
+    await new Promise(r => setTimeout(r, 200));
+    getOrLoadFurniture(key); 
+  }
+}
 
-  const path = "models/";
-  const promises = [];
-  const loadingText = document.getElementById("loading-text");
-  
-  // Cache Buster
-  const ts = "?t=" + Date.now();
-
-  const loadFile = (filename, targetObj) => {
+function getOrLoadFurniture(key) {
     return new Promise((resolve) => {
-      loader.load(path + filename + ts, (gltf) => {
-          gltf.scene.scale.set(GLOBAL_SCALE, GLOBAL_SCALE, GLOBAL_SCALE);
-          targetObj.data = gltf.scene;
-          resolve(); 
-        },
-        (xhr) => {
-           if(loadingText && xhr.total) loadingText.innerText = `Lade... ${Math.round(xhr.loaded/xhr.total*100)}%`;
-        },
-        (error) => { 
-            console.error("Fehler beim Laden:", filename, error); 
-            resolve(); // Trotzdem weitermachen
-        }
-      );
+        const obj = ASSETS.furniture[key];
+        if (obj.data) { resolve(obj.data); return; }
+
+        const loader = obj.file.endsWith('.obj') ? objLoader : gltfLoader;
+        loader.load("models/" + obj.file, (result) => {
+            const model = result.scene || result;
+            model.scale.set(GLOBAL_SCALE, GLOBAL_SCALE, GLOBAL_SCALE);
+            
+            // === WICHTIG: CLIPPING FIX VORBEREITUNG ===
+            model.traverse(c => {
+                if(c.isMesh) {
+                    c.frustumCulled = false; // Nie ausblenden
+                    if(c.geometry) {
+                        c.geometry.computeBoundingSphere();
+                        // RADIUS AUF UNENDLICH SETZEN -> IMMER SICHTBAR
+                        c.geometry.boundingSphere.radius = Infinity; 
+                    }
+                    c.castShadow = true;
+                    c.receiveShadow = true;
+                }
+            });
+            
+            obj.data = model;
+            resolve(model);
+        });
     });
-  };
+}
 
-  for (const [file, obj] of Object.entries(ASSETS.rooms)) promises.push(loadFile(file, obj));
-  for (const [id, obj] of Object.entries(ASSETS.furniture)) promises.push(loadFile(obj.file, obj));
-
-  return Promise.all(promises);
+function loadRoomAsset(filename) {
+    return new Promise((resolve, reject) => {
+        const info = ASSETS.rooms[filename];
+        if (info.data) { resolve(info.data); return; }
+        const path = "models/";
+        const loader = (info.type === 'obj' || filename.endsWith('.obj')) ? objLoader : gltfLoader;
+        loader.load(path + filename, (result) => {
+            const model = result.scene || result;
+            model.scale.set(GLOBAL_SCALE, GLOBAL_SCALE, GLOBAL_SCALE);
+            info.data = model;
+            resolve(model);
+        }, undefined, reject);
+    });
 }
 
 // === 5. Raum Logik ===
-function switchRoom(filename) {
+async function switchRoom(filename) {
   const roomInfo = ASSETS.rooms[filename];
-  if (!roomInfo || !roomInfo.data) {
-      console.warn("Raum nicht geladen:", filename);
-      return;
+  if (!roomInfo) return;
+  
+  let modelData = roomInfo.data;
+  if (!modelData) {
+      toggleLoader(true, "Wechsle Raum...");
+      try { modelData = await loadRoomAsset(filename); } 
+      catch(e) { toggleLoader(false); return; }
+      toggleLoader(false);
   }
 
-  if (currentRoomMesh) scene.remove(currentRoomMesh);
+  if (currentRoomMesh) {
+      scene.remove(currentRoomMesh);
+      currentRoomMesh.traverse(o => {
+          if(o.geometry) o.geometry.dispose();
+      });
+  }
   window.app.clearRoom();
+  setupRoom(modelData, filename);
+}
 
-  currentRoomMesh = roomInfo.data.clone();
+function setupRoom(model, filename) {
+  currentRoomFile = filename;
+  const roomInfo = ASSETS.rooms[filename];
   
-  // Auto-Zentrierung
+  currentRoomMesh = model.clone();
   const box = new THREE.Box3().setFromObject(currentRoomMesh);
   const center = box.getCenter(new THREE.Vector3());
-  const offsetY = -box.min.y; 
+  currentRoomMesh.position.set(-center.x, 0, -center.z);
 
-  currentRoomMesh.position.set(-center.x, offsetY, -center.z);
+  scene.add(currentRoomMesh);
+  currentRoomMesh.updateMatrixWorld(true);
+
+  const rayOriginY = 50;
+  const scanPoints = [
+      new THREE.Vector3(0, rayOriginY, 0),
+      new THREE.Vector3(1, rayOriginY, 1),
+      new THREE.Vector3(-1, rayOriginY, -1)
+  ];
+  let detectedFloorY = -Infinity;
+  let hitCount = 0;
+  const floorRay = new THREE.Raycaster();
+  floorRay.ray.direction.set(0, -1, 0);
+
+  scanPoints.forEach(origin => {
+      floorRay.ray.origin.copy(origin);
+      const hits = floorRay.intersectObject(currentRoomMesh, true);
+      if (hits.length > 0) {
+          const y = hits[0].point.y;
+          if (y > -10 && y < 10) {
+              if (y > detectedFloorY) detectedFloorY = y;
+              hitCount++;
+          }
+      }
+  });
+
+  if (hitCount > 0 && detectedFloorY !== -Infinity) currentRoomMesh.position.y -= detectedFloorY;
+  else currentRoomMesh.position.y = -box.min.y;
   
-  // Grenzen setzen
+  currentRoomMesh.updateMatrixWorld(true);
   currentRoomLimits = roomInfo.playableArea;
-
-  // Grenze visualisieren
-  const debugMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(currentRoomLimits.x * 2, 0.1, currentRoomLimits.z * 2),
-      new THREE.MeshBasicMaterial()
-  );
-  debugMesh.position.set(0, 0.05, 0); 
-  roomBoundaryBox.setFromObject(debugMesh);
-  roomBoundaryBox.update();
-
+  
   currentRoomMesh.traverse((child) => {
     if (child.isMesh) {
       child.receiveShadow = true;
       child.castShadow = false;
       child.material.side = THREE.DoubleSide;
+      child.frustumCulled = false; 
     }
   });
-  scene.add(currentRoomMesh);
+
+  updateSeatCount();
   window.app.setCamera('standard');
 }
 
-// === 6. App Interface ===
+function toggleLoader(show, text) {
+    const el = document.getElementById("loader");
+    const txt = document.getElementById("loading-text");
+    if(show) {
+        if(txt && text) txt.innerText = text;
+        el.style.opacity = 1;
+        el.style.pointerEvents = "auto";
+    } else {
+        el.style.opacity = 0;
+        el.style.pointerEvents = "none";
+    }
+}
+
+// === 6. Assistent ===
 window.app = {};
+window.app.switchRoom = switchRoom;
+
+function showNotification(msg) {
+    const el = document.getElementById("notification");
+    el.innerText = msg;
+    el.classList.add("visible");
+    setTimeout(() => el.classList.remove("visible"), 3000);
+}
+
+function checkBounds(positions) {
+    const padding = 0.5; 
+    const limitX = currentRoomLimits.x - padding;
+    const limitZ = currentRoomLimits.z - padding;
+    for (let p of positions) {
+        if (Math.abs(p.x) > limitX || Math.abs(p.z) > limitZ) return false;
+    }
+    return true;
+}
+
+window.app.runWizard = async function() {
+    const scenario = document.getElementById('wizard-scenario').value;
+    const count = parseInt(document.getElementById('wizard-count').value);
+    
+    let maxSeats = 60;
+    if(currentRoomFile.includes("30qm")) maxSeats = 12;
+    else if(currentRoomFile.includes("raummodell_leer") || currentRoomFile.includes("50qm")) maxSeats = 16;
+    else if(currentRoomFile.includes("70qm")) maxSeats = 20;
+
+    if(scenario === 'circle' && count > maxSeats) {
+        showNotification(`Für diesen Raum ist der Stuhlkreis auf ${maxSeats} Plätze begrenzt.`);
+        return;
+    }
+
+    const limitX = currentRoomLimits.x - 0.5;
+    const limitZ = currentRoomLimits.z - 0.5;
+    let pending = [];
+
+    switch(scenario) {
+        case 'lecture': pending = calcRows(count, limitX, limitZ); break;
+        case 'group': pending = calcGroupsK6(count, limitX, limitZ); break;
+        case 'exam': pending = calcExam(count, limitX, limitZ); break;
+        case 'circle': pending = calcCircle(count, limitX, limitZ); break;
+    }
+
+    if (!pending || pending.length === 0 || !checkBounds(pending)) {
+        showNotification("Für Ihr Vorhaben brauchen Sie einen größeren Raum.");
+        return;
+    }
+
+    app.clearRoom();
+    
+    const typeId = pending[0].id;
+    // Warten bis das Asset da ist (Ladeanzeige wenn nötig)
+    if (!ASSETS.furniture[typeId].data) toggleLoader(true, "Lade Möbel...");
+    await getOrLoadFurniture(typeId);
+    toggleLoader(false);
+
+    pending.forEach(p => createFurnitureInstance(p.id, p.x, p.z, p.r));
+};
+
+function calcRows(count, lx, lz) {
+    const itemWidth = 1.3; 
+    const itemDepth = 1.8; 
+    const cols = Math.floor((lx * 2) / itemWidth);
+    let res = [];
+    const startX = -(cols * itemWidth) / 2 + (itemWidth/2);
+    const startZ = -(Math.ceil(count/cols) * itemDepth) / 2 + (itemDepth/2);
+    for(let i=0; i<count; i++) {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        res.push({id: 'row_combo', x: startX + (col * itemWidth), z: startZ + (row * itemDepth), r: Math.PI});
+    }
+    return res;
+}
+
+function calcGroupsK6(count, lx, lz) {
+    const groupsNeeded = Math.ceil(count / 6);
+    let res = [];
+    const dist = 2.0; 
+    const positions = [
+        {x: -dist, z: -dist}, {x: dist, z: -dist},  
+        {x: -dist, z: dist}, {x: dist, z: dist},   
+        {x: 0, z: 0}, {x: 0, z: -dist}, {x: 0, z: dist}       
+    ];
+    if(groupsNeeded > positions.length) return null;
+    
+    const r = ASSETS.furniture['k6'].radius;
+    for (let i = 0; i < groupsNeeded; i++) {
+        const pos = positions[i];
+        if((Math.abs(pos.x) + r) > lx || (Math.abs(pos.z) + r) > lz) return null;
+        res.push({id: 'k6', x: pos.x, z: pos.z, r: 0});
+    }
+    return res;
+}
+
+function calcExam(count, lx, lz) {
+    const itemWidth = 1.8; 
+    const itemDepth = 1.8; 
+    const cols = Math.floor((lx * 2) / itemWidth);
+    let res = [];
+    const startX = -(cols * itemWidth) / 2 + (itemWidth/2);
+    const startZ = -lz + 1.5;
+    for(let i=0; i<count; i++) {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        res.push({id: 'row_combo', x: startX + (col * itemWidth), z: startZ + (row * itemDepth), r: Math.PI});
+    }
+    return res;
+}
+
+function calcCircle(count, lx, lz) {
+    const radius = Math.min(lx, lz) - 1.0;
+    const angleStep = (2 * Math.PI) / count;
+    let res = [];
+    for(let i=0; i<count; i++) {
+        const angle = i * angleStep;
+        res.push({id: 'chair', x: Math.sin(angle) * radius, z: Math.cos(angle) * radius, r: angle + Math.PI});
+    }
+    return res;
+}
 
 function updateSeatCount() {
     let total = 0;
     movableObjects.forEach(obj => {
-        const hitbox = obj.children.find(c => c.userData.typeId);
-        if(hitbox) {
-            const id = hitbox.userData.typeId;
-            total += (ASSETS.furniture[id].seats || 0);
-        }
+        if(obj.userData.typeId) total += (ASSETS.furniture[obj.userData.typeId].seats || 0);
     });
     document.getElementById("seat-count").innerText = total;
 }
 
-window.app.toggleUI = function() {
-    document.getElementById("ui-container").classList.toggle("hidden");
-};
-
+window.app.toggleUI = function() { document.getElementById("ui-layer").classList.toggle("hidden"); };
 window.app.takeScreenshot = function() {
     renderer.render(scene, camera);
     const link = document.createElement('a');
@@ -259,57 +409,81 @@ window.app.takeScreenshot = function() {
     link.click();
 };
 
-function createFurniture(typeId, x, z, rotY) {
-  const info = ASSETS.furniture[typeId];
-  if (!info || !info.data) return;
+function createFurnitureInstance(typeId, x, z, rotY) {
+    const info = ASSETS.furniture[typeId];
+    if (!info.data) return;
 
-  const group = info.data.clone();
-  group.traverse((c) => { 
-      if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; c.raycast = () => {}; } 
-  });
+    const visual = info.data.clone();
+    
+    // === FINALER CLIPPING FIX AUF CLONES ===
+    visual.traverse(c => {
+        if(c.isMesh) {
+            c.frustumCulled = false; // DEAKTIVIERT CULLING
+            if(c.geometry) {
+                c.geometry.computeBoundingSphere();
+                c.geometry.boundingSphere.radius = Infinity; // SICHERHEITSHALBER UNENDLICH
+            }
+            c.castShadow = true;
+            c.receiveShadow = true;
+        }
+    });
 
-  const box = new THREE.Box3().setFromObject(group);
-  const size = new THREE.Vector3();
-  box.getSize(size);
+    const box = new THREE.Box3().setFromObject(visual);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const center = new THREE.Vector3(); box.getCenter(center);
 
-  const hitbox = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({visible:false}));
-  hitbox.position.set(0, size.y/2, 0);
-  hitbox.userData = { root: group, typeId: typeId };
-  group.add(hitbox);
+    const wrapper = new THREE.Group();
+    visual.position.x = -center.x; 
+    visual.position.y = -box.min.y; 
+    visual.position.z = -center.z;
+    
+    wrapper.add(visual);
 
-  group.position.set(x, FURNITURE_HEIGHT, z);
-  group.rotation.y = rotY;
+    const hitW = Math.max(size.x + HITBOX_PADDING, 0.8);
+    const hitH = Math.max(size.y + HITBOX_PADDING, 1.2);
+    const hitD = Math.max(size.z + HITBOX_PADDING, 0.8);
+    
+    const hitbox = new THREE.Mesh(
+        new THREE.BoxGeometry(hitW, hitH, hitD), 
+        new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0 }) 
+    );
+    hitbox.position.y = hitH / 2;
+    
+    wrapper.userData = { typeId: typeId, root: wrapper, isWallItem: !!info.isWallItem };
+    hitbox.userData = { root: wrapper };
 
-  scene.add(group);
-  movableObjects.push(group);
-  interactionMeshes.push(hitbox);
-  
-  updateSeatCount();
+    wrapper.add(hitbox);
+    wrapper.position.set(x, FURNITURE_Y_OFFSET, z); 
+    wrapper.rotation.y = rotY;
+
+    scene.add(wrapper);
+    movableObjects.push(wrapper);
+    interactionMeshes.push(hitbox);
+    
+    updateSeatCount();
 }
 
-window.app.addFurniture = function (typeId) {
-    createFurniture(typeId, 0, 0, 0);
-    const lastObj = movableObjects[movableObjects.length-1];
-    if(lastObj) selectObject(lastObj);
-};
+window.app.addFurniture = async function (typeId) {
+    // Falls noch nicht geladen, lade jetzt mit Overlay
+    if(!ASSETS.furniture[typeId].data) toggleLoader(true, "Lade Objekt...");
+    await getOrLoadFurniture(typeId);
+    toggleLoader(false);
 
-window.app.loadPreset = function(name) {
-    window.app.clearRoom(); 
-    const layout = PRESETS[name];
-    if(!layout) return;
+    createFurnitureInstance(typeId, 0, 0, 0);
     
-    layout.forEach(item => {
-        let px = item.x; let pz = item.z;
-        const limX = currentRoomLimits.x - 1.0;
-        const limZ = currentRoomLimits.z - 1.0;
-        if (px > limX) px = limX; if (px < -limX) px = -limX;
-        if (pz > limZ) pz = limZ; if (pz < -limZ) pz = -limZ;
-        createFurniture(item.id, px, pz, item.r);
-    });
+    setTimeout(() => {
+        const lastObj = movableObjects[movableObjects.length-1];
+        if(lastObj) selectObject(lastObj);
+    }, 50);
 };
 
 window.app.clearRoom = function() {
-    movableObjects.forEach(obj => scene.remove(obj));
+    movableObjects.forEach(obj => {
+        scene.remove(obj);
+        obj.traverse(c => {
+            if(c.geometry) c.geometry.dispose();
+        });
+    });
     movableObjects = [];
     interactionMeshes = [];
     deselectObject();
@@ -323,42 +497,28 @@ window.app.rotateSelection = function(dir) {
 };
 
 window.app.deleteSelection = function() {
-    deleteSelection();
+    if (selectedRoot) {
+      if(hoveredRoot === selectedRoot) hoveredRoot = null;
+      scene.remove(selectedRoot);
+      movableObjects = movableObjects.filter(o => o !== selectedRoot);
+      const hitbox = selectedRoot.children.find(c => c.isMesh && c.geometry.type === 'BoxGeometry');
+      if(hitbox) interactionMeshes = interactionMeshes.filter(m => m !== hitbox);
+      deselectObject();
+      updateSeatCount();
+    }
 };
 
 window.app.setCamera = function(mode) {
   controls.enabled = true;
-  controls.minDistance = 1;
+  document.getElementById('ui-layer').style.pointerEvents = 'none'; 
+  
   if (mode === 'standard') smoothCameraMove(new THREE.Vector3(8, 8, 10), new THREE.Vector3(0, 0, 0));
   else if (mode === 'top') smoothCameraMove(new THREE.Vector3(0, 16, 0.1), new THREE.Vector3(0, 0, 0));
   else if (mode === 'corner') smoothCameraMove(new THREE.Vector3(12, 8, 12), new THREE.Vector3(0, 0, 0));
 };
 
-window.app.enterPOV = function() {
-  if (!selectedRoot) return;
-  const pos = selectedRoot.position.clone();
-  const camPos = new THREE.Vector3(pos.x, 1.7, pos.z + 1.5);
-  const lookPos = new THREE.Vector3(pos.x, 1.0, pos.z - 2.0);
-  smoothCameraMove(camPos, lookPos);
-};
-
-// === 7. Interaktion ===
-function setEmissive(obj, color) {
-    obj.traverse((c) => {
-        if(c.isMesh && c.material && c.material.emissive) {
-            if(color) {
-                if(!c.userData.origEmissive) c.userData.origEmissive = c.material.emissive.clone();
-                c.material.emissive.setHex(color);
-            } else {
-                if(c.userData.origEmissive) c.material.emissive.copy(c.userData.origEmissive);
-                else c.material.emissive.setHex(0x000000);
-            }
-        }
-    });
-}
-
 function onMouseDown(event) {
-  if(event.button !== 0) return;
+  if(event.button !== 0) return; 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
@@ -379,20 +539,21 @@ function onMouseDown(event) {
 }
 
 function checkCollision(targetPos, activeObj) {
-    const activeId = activeObj.children.find(c => c.userData.typeId)?.userData.typeId || 1;
-    const r1 = ASSETS.furniture[activeId].radius * GLOBAL_SCALE; 
+    const activeId = activeObj.userData.typeId;
+    if(activeObj.userData.isWallItem) return false;
+
+    const r1 = ASSETS.furniture[activeId]?.radius || 1.0;
+    const scaleFactor = GLOBAL_SCALE * 0.4; 
     for (let other of movableObjects) {
         if (other === activeObj) continue;
-        const otherId = other.children.find(c => c.userData.typeId)?.userData.typeId || 1;
-        const r2 = ASSETS.furniture[otherId].radius * GLOBAL_SCALE;
+        const otherId = other.userData.typeId;
+        const r2 = ASSETS.furniture[otherId]?.radius || 1.0;
         const dx = targetPos.x - other.position.x;
         const dz = targetPos.z - other.position.z;
-        if (Math.sqrt(dx*dx + dz*dz) < (r1 + r2) * 0.75) return true; 
+        if (Math.sqrt(dx*dx + dz*dz) < (r1 + r2) * scaleFactor) return true; 
     }
     return false;
 }
-
-function snap(val) { return Math.round(val / GRID_SNAP) * GRID_SNAP; }
 
 function onMouseMove(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -403,62 +564,69 @@ function onMouseMove(event) {
       const planeIntersect = new THREE.Vector3();
       if (raycaster.ray.intersectPlane(dragPlane, planeIntersect)) {
         const rawPos = planeIntersect.sub(dragOffset);
-        let newX = snap(rawPos.x);
-        let newZ = snap(rawPos.z);
-
-        const typeId = selectedRoot.children.find(c => c.userData.typeId)?.userData.typeId || 1;
-        const radius = ASSETS.furniture[typeId].radius * GLOBAL_SCALE;
-        const limitX = currentRoomLimits.x - (radius * 0.6); 
-        const limitZ = currentRoomLimits.z - (radius * 0.6);
-
-        newX = Math.max(-limitX, Math.min(limitX, newX));
-        newZ = Math.max(-limitZ, Math.min(limitZ, newZ));
         
-        const isColliding = checkCollision({x:newX, z:newZ}, selectedRoot);
+        let newX = rawPos.x;
+        let newZ = rawPos.z;
         
-        if (!isColliding) {
-             selectedRoot.position.set(newX, selectedRoot.position.y, newZ);
-             selectionBox.material.color.setHex(0x00e5ff); 
+        const isWall = selectedRoot.userData.isWallItem;
+        const limitX = currentRoomLimits.x;
+        const limitZ = currentRoomLimits.z;
+
+        if (isWall) {
+            const wallOffset = 0.5; 
+            const dRight = Math.abs(limitX - rawPos.x);
+            const dLeft = Math.abs(-limitX - rawPos.x);
+            const dBottom = Math.abs(limitZ - rawPos.z);
+            const dTop = Math.abs(-limitZ - rawPos.z);
+            const min = Math.min(dRight, dLeft, dBottom, dTop);
+
+            if (min === dTop) { newZ = -limitZ + wallOffset; selectedRoot.rotation.y = 0; }
+            else if (min === dBottom) { newZ = limitZ - wallOffset; selectedRoot.rotation.y = Math.PI; }
+            else if (min === dRight) { newX = limitX - wallOffset; selectedRoot.rotation.y = -Math.PI / 2; }
+            else if (min === dLeft) { newX = -limitX + wallOffset; selectedRoot.rotation.y = Math.PI / 2; }
+
+            if (min === dTop || min === dBottom) newX = Math.max(-(limitX - 1), Math.min((limitX - 1), rawPos.x));
+            else newZ = Math.max(-(limitZ - 1), Math.min((limitZ - 1), rawPos.z));
+
+            selectedRoot.position.set(newX, FURNITURE_Y_OFFSET, newZ);
+            selectionBox.material.color.setHex(0x007acc);
         } else {
-             selectionBox.material.color.setHex(0xff3d00); 
+            const radius = ASSETS.furniture[selectedRoot.userData.typeId]?.radius || 1.0;
+            const lX = limitX - (radius * 0.4); 
+            const lZ = limitZ - (radius * 0.4);
+            newX = Math.max(-lX, Math.min(lX, newX));
+            newZ = Math.max(-lZ, Math.min(lZ, newZ));
+            
+            const isColliding = checkCollision({x:newX, z:newZ}, selectedRoot);
+            selectedRoot.position.set(newX, FURNITURE_Y_OFFSET, newZ); 
+            selectionBox.material.color.setHex(isColliding ? 0xd73a49 : 0x007acc);
         }
         selectionBox.update();
       }
       return;
   }
-
   const intersects = raycaster.intersectObjects(interactionMeshes, false);
   if (intersects.length > 0) {
-      const root = intersects[0].object.userData.root;
       document.body.style.cursor = "grab";
-      if(hoveredRoot !== root) {
-          if(hoveredRoot) setEmissive(hoveredRoot, null); 
-          setEmissive(root, 0x333333); 
-          hoveredRoot = root;
-      }
   } else {
       document.body.style.cursor = "default";
-      if(hoveredRoot) {
-          setEmissive(hoveredRoot, null);
-          hoveredRoot = null;
-      }
   }
 }
 
 function onMouseUp() { 
-    isDragging = false; 
-    controls.enabled = true; 
-    if(hoveredRoot) document.body.style.cursor = "grab";
-    else document.body.style.cursor = "default";
+    if(isDragging) {
+        isDragging = false; 
+        controls.enabled = true; 
+    }
 }
 
 function onKeyDown(event) {
-  if (event.key === "Escape") document.getElementById("ui-container").classList.remove("hidden");
+  if (event.key === "Escape") app.setCamera('standard'); 
   if (!selectedRoot) return;
   const key = event.key.toLowerCase();
   if (key === "r") { 
       selectedRoot.rotation.y += Math.PI / 4; 
-      selectionBox.update();
+      selectionBox.update(); 
   }
   if (key === "delete" || key === "backspace") deleteSelection();
 }
@@ -467,26 +635,14 @@ function selectObject(obj) {
   selectedRoot = obj;
   selectionBox.setFromObject(obj);
   selectionBox.visible = true;
-  selectionBox.material.color.setHex(0x00e5ff);
-  document.getElementById("selection-context").classList.add("visible");
+  selectionBox.material.color.setHex(0x007acc);
+  document.getElementById("context-menu").classList.add("visible");
 }
 
 function deselectObject() {
   selectedRoot = null;
   selectionBox.visible = false;
-  document.getElementById("selection-context").classList.remove("visible");
-}
-
-function deleteSelection() {
-  if (selectedRoot) {
-    if(hoveredRoot === selectedRoot) hoveredRoot = null;
-    scene.remove(selectedRoot);
-    movableObjects = movableObjects.filter(o => o !== selectedRoot);
-    const hitbox = selectedRoot.children.find(c => c.userData && c.userData.root);
-    if(hitbox) interactionMeshes = interactionMeshes.filter(m => m !== hitbox);
-    deselectObject();
-    updateSeatCount();
-  }
+  document.getElementById("context-menu").classList.remove("visible");
 }
 
 function smoothCameraMove(targetPos, targetLookAt) {

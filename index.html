@@ -3,124 +3,145 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LLR 3D Raumplaner</title>
+    <title>ELMeKS.digital Raumplaner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       :root { 
-        --primary: #00e5ff; 
-        --glass: rgba(25, 25, 30, 0.95); 
-        --text: #f0f0f0;
-        --danger: #ff5252;
+        --bg-dark: #1e1e1e;
+        --bg-panel: #252526;
+        --border: #3e3e42;
+        --primary: #007acc; 
+        --primary-hover: #0062a3;
+        --text: #cccccc;
+        --text-light: #ffffff;
+        --danger: #d73a49;
+        --btn-bg: #333333;
+        --btn-hover: #444444;
       }
       
       body { 
         margin: 0; overflow: hidden; 
-        font-family: "Segoe UI", Roboto, sans-serif; 
-        color: var(--text); background: #1a1a1a; 
+        font-family: 'Inter', "Segoe UI", sans-serif; 
+        color: var(--text); background: var(--bg-dark); 
         user-select: none;
+        font-size: 14px;
       }
       
       canvas { display: block; width: 100vw; height: 100vh; outline: none; }
       
-      /* UI Container */
-      #ui-container { 
+      #ui-layer { 
         position: absolute; inset: 0; pointer-events: none; 
         display: flex; flex-direction: column; justify-content: space-between;
-        transition: opacity 0.3s;
       }
-      #ui-container.hidden { opacity: 0; pointer-events: none; }
-
+      
       /* Top Bar */
       .top-bar {
-        background: var(--glass); padding: 10px 20px; 
-        display: flex; align-items: center; gap: 12px;
-        pointer-events: auto; border-bottom: 1px solid #444; 
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        background: var(--bg-panel); 
+        height: 50px;
+        display: flex; align-items: center; padding: 0 20px;
+        border-bottom: 1px solid var(--border);
+        pointer-events: auto;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
       }
       
-      .logo { font-weight:bold; color:var(--primary); margin-right:10px; }
+      .brand { font-weight: 600; color: var(--text-light); margin-right: 20px; letter-spacing: 0.5px; }
+      .separator { width: 1px; height: 20px; background: var(--border); margin: 0 15px; }
+      .label-small { font-size: 11px; color: #888; margin-right: 8px; text-transform: uppercase; font-weight: 600; }
 
-      select { 
-        padding: 8px 12px; border-radius: 6px; 
-        background: #333; color: white; border: 1px solid #555; 
-        cursor: pointer; font-size: 0.9rem; outline: none;
+      select, button {
+        background: var(--btn-bg); color: var(--text-light); border: 1px solid var(--border);
+        padding: 6px 12px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 13px;
+        transition: all 0.2s; outline: none;
       }
-      select:hover { border-color: var(--primary); }
+      select:hover, button:hover { background: var(--btn-hover); border-color: #555; }
+      button:active { transform: translateY(1px); }
       
-      .separator { width: 1px; height: 24px; background: #555; margin: 0 5px; }
+      button.primary { background: var(--primary); border-color: var(--primary); color: white; }
+      button.primary:hover { background: var(--primary-hover); }
       
-      /* Stats Panel (Rechts) */
-      .stats-panel {
-        margin-left: auto; display: flex; align-items: center; gap: 15px;
+      button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+      button.danger:hover { background: var(--danger); color: white; }
+      
+      /* Preset Buttons */
+      .preset-grid { display: flex; flex-direction: column; gap: 6px; }
+      button.preset-btn { 
+        width: 100%; text-align: left; 
+        background: #2d2d2d; border: 1px solid #3e3e42;
+        padding: 10px; font-weight: 500;
+        display: flex; justify-content: space-between; align-items: center;
       }
-      .seat-counter {
-        background: rgba(0, 229, 255, 0.15); border: 1px solid var(--primary);
-        padding: 5px 12px; border-radius: 4px; font-weight: bold; color: var(--primary);
-        font-size: 0.9rem;
+      button.preset-btn:hover { background: #383838; border-color: #555; transform: translateX(2px); }
+      button.preset-btn::after { content: '›'; color: #666; font-weight: bold; }
+
+      .stats { margin-left: auto; font-weight: 500; color: var(--text-light); display: flex; align-items: center; gap: 10px; }
+      .badge { background: var(--primary); padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+
+      /* Sidebar */
+      .sidebar {
+        position: absolute; top: 70px; left: 20px; bottom: 80px; width: 280px;
+        display: flex; flex-direction: column; gap: 15px; pointer-events: none;
+        overflow-y: auto; padding-right: 5px;
+      }
+      .sidebar::-webkit-scrollbar { width: 4px; }
+      .sidebar::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+      .panel {
+        background: var(--bg-panel); border: 1px solid var(--border);
+        border-radius: 6px; padding: 15px; pointer-events: auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      }
+      .panel-header {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 10px; font-weight: 600;
       }
 
-      /* Sidebar (Links) */
-      .preset-bar {
-        position: absolute; top: 80px; left: 20px; 
-        background: var(--glass); padding: 15px;
-        border-radius: 12px; pointer-events: auto; 
-        display: flex; flex-direction: column; gap: 8px;
-        border: 1px solid #444; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        width: 150px;
-      }
-      .preset-title { 
-        font-size: 0.75rem; color: #888; margin-bottom: 5px; 
-        font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-      }
-
-      /* Context Menu (Unten Mitte bei Auswahl) */
-      #selection-context {
-        position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
-        background: var(--glass); padding: 10px 20px; border-radius: 50px;
-        display: flex; gap: 10px; align-items: center;
-        border: 1px solid var(--primary);
-        box-shadow: 0 5px 30px rgba(0,0,0,0.6);
-        opacity: 0; pointer-events: none; transition: all 0.2s ease;
-        transform: translateX(-50%) translateY(20px);
-      }
-      #selection-context.visible {
-        opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0);
-      }
+      .input-group { margin-bottom: 10px; }
+      .input-group label { display: block; font-size: 12px; margin-bottom: 4px; color: #aaa; }
+      .input-group input, .input-group select { width: 100%; box-sizing: border-box; }
 
       /* Bottom Bar */
       .bottom-bar {
-        background: var(--glass); padding: 15px; 
-        display: flex; justify-content: center; gap: 15px;
-        pointer-events: auto; border-top: 1px solid #444;
+        position: absolute; bottom: 20px; left: 320px; right: 20px;
+        background: var(--bg-panel); border: 1px solid var(--border);
+        border-radius: 6px; padding: 10px 20px;
+        display: flex; align-items: center; gap: 20px;
+        pointer-events: auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        flex-wrap: wrap;
       }
+      .tool-section { display: flex; gap: 8px; align-items: center; }
+      .tool-label { font-size: 11px; color: #666; font-weight: 600; margin-right: 8px; text-transform: uppercase; }
 
-      /* Buttons */
-      button {
-        background: #3a3a3a; color: white; border: 1px solid #555; 
-        padding: 8px 14px; border-radius: 6px;
-        cursor: pointer; transition: all 0.2s; 
-        display: flex; align-items: center; gap: 6px; font-size: 0.9rem;
+      /* Context Menu */
+      #context-menu {
+        position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+        background: var(--bg-panel); padding: 8px 16px; border-radius: 30px;
+        display: flex; gap: 10px; align-items: center;
+        border: 1px solid var(--primary);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+        transform: translateX(-50%) translateY(10px);
       }
-      button:hover { background: #505050; border-color: #999; }
-      button:active { transform: translateY(1px); }
+      #context-menu.visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
 
-      button.icon-btn { padding: 8px 10px; }
-      
-      button.preset-btn { 
-        width: 100%; justify-content: flex-start; background: transparent; border-color: transparent;
+      #notification {
+        position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+        background: var(--danger); color: white; padding: 10px 20px; border-radius: 4px;
+        font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        z-index: 2000; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
       }
-      button.preset-btn:hover { background: rgba(255,255,255,0.1); }
+      #notification.visible { opacity: 1; }
 
-      button.delete-btn { background: rgba(255, 82, 82, 0.2); border-color: var(--danger); color: var(--danger); }
-      button.delete-btn:hover { background: var(--danger); color: white; }
-
-      /* Loader */
       #loader {
-        position: absolute; inset: 0; background: #121212; z-index: 2000;
+        position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
+        transition: opacity 0.3s;
+        opacity: 0; pointer-events: none; /* Hidden by default */
       }
+      #loader.active { opacity: 1; pointer-events: auto; }
+      
       .spinner {
-        width: 40px; height: 40px; border: 3px solid #333; border-top: 3px solid var(--primary);
-        border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;
+        width: 30px; height: 30px; border: 3px solid #333; border-top: 3px solid var(--primary);
+        border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 15px;
       }
       @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
@@ -129,57 +150,109 @@
     
     <div id="loader">
       <div class="spinner"></div>
-      <div id="loading-text" style="color:#888;">Lade 3D Modelle...</div>
+      <div id="loading-text" style="color:#ddd; font-size: 14px; font-weight:500;">Lade...</div>
     </div>
+    
+    <div id="notification"></div>
 
-    <div id="ui-container">
-      <!-- Oben -->
+    <div id="ui-layer">
+      <!-- Top Navigation -->
       <div class="top-bar">
-        <div class="logo">LLR 3D</div>
+        <div class="brand">ELMeKS.digital Raumplaner</div>
+        
         <select id="room-select">
-          <option value="raummodell_leer.glb" selected>LLR Standard (~75 m²)</option>
-          <option value="raummodell_in_x_gestreckt.glb">Raum Breit (~90 m²)</option>
-          <option value="raummodell_in_z_gestreckt.glb">Raum Lang (~90 m²)</option>
-          <option value="raummodell_in_x_z_gestreckt.glb">Großer Saal (~110 m²)</option>
+          <option value="raummodell_leer.glb" selected>LLR (50m²)</option>
+          <option value="LLR_möbliert(50qm).obj">LLR möbliert (50m²)</option>
+          <option value="leer_70qm.glb">Großer Raum (70m²)</option>
+          <option value="leer_30qm.glb">Kleiner Raum (30m²)</option>
         </select>
         
         <div class="separator"></div>
-        <button class="icon-btn" onclick="app.setCamera('standard')">🏠 Kamera zurücksetzen</button>
-        <button class="icon-btn" onclick="app.setCamera('top')">🦅 Draufsicht</button>
-        <button class="icon-btn" onclick="app.setCamera('corner')">📐 Eckansicht</button>
-        <button class="icon-btn" onclick="app.takeScreenshot()">📸 Bild erstellen</button>
+        
+        <span class="label-small">Kameraposition:</span>
+        <button onclick="app.setCamera('standard')">Standard</button>
+        <button onclick="app.setCamera('top')">Grundriss</button>
+        <button onclick="app.setCamera('corner')">Isometrisch</button>
+        <div class="separator"></div>
+        <button onclick="app.takeScreenshot()">Export Bild</button>
 
-        <div class="stats-panel">
-          <div class="seat-counter">
-            🪑 <span id="seat-count">0</span> Plätze
-          </div>
-          <button class="icon-btn" onclick="app.toggleUI()" title="UI Ausblenden">👁️</button>
+        <div class="stats">
+          <span>Plätze:</span>
+          <span class="badge" id="seat-count">0</span>
         </div>
       </div>
 
-      <!-- Links (Presets) -->
-      <div class="preset-bar">
-        <div class="preset-title">Schnellstart</div>
-        <button class="preset-btn" onclick="app.loadPreset('rows')">🟰 Reihen</button>
-        <button class="preset-btn" onclick="app.loadPreset('groups')">🎲 Gruppen</button>
-        <div style="height:1px; background:#444; margin:5px 0;"></div>
-        <button class="preset-btn danger" onclick="app.clearRoom()">❌ Leeren</button>
+      <!-- Left Sidebar -->
+      <div class="sidebar">
+        
+        <!-- Panel 1: Assistent -->
+        <div class="panel">
+          <div class="panel-header">Planungs-Assistent</div>
+          
+          <div class="input-group">
+            <label>Szenario</label>
+            <select id="wizard-scenario">
+              <option value="lecture">Plenum (Reihen)</option>
+              <option value="group">Gruppenarbeit (6er)</option>
+              <option value="circle">Stuhlkreis</option>
+              <option value="exam">Klausur (Einzeln)</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Personenanzahl (Ziel)</label>
+            <input type="number" id="wizard-count" value="20" min="1" max="60" style="background:#333; color:white; border:1px solid #444; padding:6px; border-radius:4px;">
+          </div>
+
+          <button class="primary full-width" style="width:100%" onclick="app.runWizard()">Vorschlag generieren</button>
+        </div>
+
+        <!-- Panel 2: Manuelle Konstellationen -->
+        <div class="panel">
+          <div class="panel-header">Manuelle Konstellationen</div>
+          <div class="preset-grid">
+            <button class="preset-btn" onclick="app.addFurniture('k1')">2er Ecktisch</button>
+            <button class="preset-btn" onclick="app.addFurniture('k2')">2er Vis-a-Vis</button>
+            <button class="preset-btn" onclick="app.addFurniture('k5')">4er Ecktisch</button>
+            <button class="preset-btn" onclick="app.addFurniture('k6')">6er Gruppentisch</button>
+            <button class="preset-btn" onclick="app.addFurniture('k4')">8er Kreis (offen)</button>
+            <button class="preset-btn" onclick="app.addFurniture('k3')">8er Gruppentisch</button>
+            <button class="preset-btn" onclick="app.addFurniture('k8')">9er U-Form (Spitz)</button>
+            <button class="preset-btn" onclick="app.addFurniture('k7')">11er U-Form</button>
+          </div>
+        </div>
+
+        <!-- Panel 3: Aktionen -->
+        <div class="panel">
+          <div class="panel-header">Aktionen</div>
+          <button class="danger full-width" style="width:100%" onclick="app.clearRoom()">Raum leeren</button>
+        </div>
       </div>
 
-      <!-- Kontext Menü (Erscheint bei Auswahl) -->
-      <div id="selection-context">
-        <button onclick="app.rotateSelection(1)">⟲ Links</button>
-        <button onclick="app.rotateSelection(-1)">Rechts ⟳</button>
-        <button onclick="app.enterPOV()">👁️ Ansicht</button>
+      <!-- Context Menu -->
+      <div id="context-menu">
+        <button onclick="app.rotateSelection(1)">Drehen L</button>
+        <button onclick="app.rotateSelection(-1)">Drehen R</button>
         <div class="separator"></div>
-        <button class="delete-btn" onclick="app.deleteSelection()">🗑️ Löschen</button>
+        <button class="danger" onclick="app.deleteSelection()">Entfernen</button>
       </div>
 
-      <!-- Unten (Möbel) -->
+      <!-- Bottom Bar -->
       <div class="bottom-bar">
-        <button onclick="app.addFurniture(1)">🪑 Ecktisch (2)</button>
-        <button onclick="app.addFurniture(2)">🪑 Paartisch (2)</button>
-        <button onclick="app.addFurniture(3)">🪑 Gruppentisch (8)</button>
+        <div class="tool-section">
+          <div class="tool-label">Möbel</div>
+          <button onclick="app.addFurniture('row_combo')">Tisch+Stuhl</button>
+          <button onclick="app.addFurniture('tano')">Tano-Tisch</button>
+          <button onclick="app.addFurniture('triangle')">Dreieck</button>
+          <button onclick="app.addFurniture('chair')">Stuhl</button>
+        </div>
+        <div class="separator"></div>
+        <div class="tool-section">
+          <div class="tool-label">Ausstattung</div>
+          <button onclick="app.addFurniture('board')">Tafel</button>
+          <button onclick="app.addFurniture('teacher')">Pult</button>
+          <button onclick="app.addFurniture('cupboard')">Regal</button>
+        </div>
       </div>
     </div>
 
