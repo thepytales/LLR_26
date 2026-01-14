@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ELMeKS.digital Raumplaner</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- PDF Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    
+    <script>
+      function togglePanel(header) {
+        const parent = header.parentElement;
+        const wasClosed = parent.classList.contains('collapsed');
+        document.querySelectorAll('.sidebar .panel:not(#vision-panel)').forEach(p => p.classList.add('collapsed'));
+        if (wasClosed) parent.classList.remove('collapsed');
+      }
+    </script>
+
     <style>
       :root { 
         --bg-dark: #1e1e1e;
@@ -15,8 +28,11 @@
         --text: #cccccc;
         --text-light: #ffffff;
         --danger: #d73a49;
+        --warning: #d4a72c;
+        --success: #2ea043;
         --btn-bg: #333333;
         --btn-hover: #444444;
+        --tu-blue: #00305D;
       }
       
       body { 
@@ -36,50 +52,50 @@
       
       /* Top Bar */
       .top-bar {
-        background: var(--bg-panel); 
-        height: 50px;
+        background: var(--bg-panel); height: 50px;
         display: flex; align-items: center; padding: 0 20px;
-        border-bottom: 1px solid var(--border);
-        pointer-events: auto;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        border-bottom: 1px solid var(--border); pointer-events: auto;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2); gap: 10px;
       }
-      
-      .brand { font-weight: 600; color: var(--text-light); margin-right: 20px; letter-spacing: 0.5px; }
-      .separator { width: 1px; height: 20px; background: var(--border); margin: 0 15px; }
-      .label-small { font-size: 11px; color: #888; margin-right: 8px; text-transform: uppercase; font-weight: 600; }
+      .brand { font-weight: 600; color: var(--text-light); margin-right: 10px; letter-spacing: 0.5px; white-space: nowrap; }
+      .separator { width: 1px; height: 20px; background: var(--border); margin: 0 5px; }
+      .spacer { flex-grow: 1; }
 
       select, button {
         background: var(--btn-bg); color: var(--text-light); border: 1px solid var(--border);
         padding: 6px 12px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 13px;
-        transition: all 0.2s; outline: none;
+        transition: all 0.2s; outline: none; white-space: nowrap;
       }
       select:hover, button:hover { background: var(--btn-hover); border-color: #555; }
       button:active { transform: translateY(1px); }
       
       button.primary { background: var(--primary); border-color: var(--primary); color: white; }
       button.primary:hover { background: var(--primary-hover); }
-      
       button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
       button.danger:hover { background: var(--danger); color: white; }
-      
-      /* Preset Buttons */
-      .preset-grid { display: flex; flex-direction: column; gap: 6px; }
-      button.preset-btn { 
-        width: 100%; text-align: left; 
-        background: #2d2d2d; border: 1px solid #3e3e42;
-        padding: 10px; font-weight: 500;
-        display: flex; justify-content: space-between; align-items: center;
-      }
-      button.preset-btn:hover { background: #383838; border-color: #555; transform: translateX(2px); }
-      button.preset-btn::after { content: '›'; color: #666; font-weight: bold; }
+      button.danger.solid { background: var(--danger); color: white; }
+      button.active { background: var(--primary); border-color: var(--text-light); color: white; }
 
-      .stats { margin-left: auto; font-weight: 500; color: var(--text-light); display: flex; align-items: center; gap: 10px; }
-      .badge { background: var(--primary); padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+      /* Top Bar Dropdown */
+      .dropdown { position: relative; display: inline-block; }
+      .dropdown-content {
+        display: none; position: absolute; right: 0; top: 100%;
+        background-color: var(--bg-panel); min-width: 240px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.5); z-index: 1000;
+        border: 1px solid var(--border); border-radius: 4px; padding: 5px 0;
+      }
+      .dropdown:hover .dropdown-content { display: block; }
+      .dropdown-content button {
+        width: 100%; text-align: left; border: none; background: transparent;
+        padding: 10px 15px; border-bottom: 1px solid #333;
+      }
+      .dropdown-content button:last-child { border-bottom: none; }
+      .dropdown-content button:hover { background: var(--btn-hover); }
 
       /* Sidebar */
       .sidebar {
-        position: absolute; top: 70px; left: 20px; bottom: 80px; width: 280px;
-        display: flex; flex-direction: column; gap: 15px; pointer-events: none;
+        position: absolute; top: 70px; left: 20px; bottom: 80px; width: 320px;
+        display: flex; flex-direction: column; gap: 10px; pointer-events: none;
         overflow-y: auto; padding-right: 5px;
       }
       .sidebar::-webkit-scrollbar { width: 4px; }
@@ -87,26 +103,65 @@
 
       .panel {
         background: var(--bg-panel); border: 1px solid var(--border);
-        border-radius: 6px; padding: 15px; pointer-events: auto;
+        border-radius: 6px; pointer-events: auto; overflow: hidden;
         box-shadow: 0 4px 20px rgba(0,0,0,0.3);
       }
       .panel-header {
-        font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 10px; font-weight: 600;
+        padding: 12px 15px; font-size: 12px; text-transform: uppercase; 
+        letter-spacing: 1px; color: #aaa; font-weight: 600; cursor: pointer;
+        display: flex; justify-content: space-between; align-items: center;
+        background: rgba(255,255,255,0.02); select-none;
       }
+      .panel-header:hover { background: rgba(255,255,255,0.05); color: white; }
+      .panel-header::after { content: '▼'; font-size: 10px; transition: transform 0.3s; }
+      .panel.collapsed .panel-header::after { transform: rotate(-90deg); }
+      
+      .panel-content { padding: 15px; transition: max-height 0.3s ease-out; max-height: 600px; overflow: visible; }
+      .panel.collapsed .panel-content { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; opacity: 0; }
+
+      .sidebar-action-btn {
+        background: var(--bg-panel); border: 1px solid var(--danger); color: var(--danger);
+        padding: 12px; border-radius: 6px; font-weight: 600; width: 100%; text-align: center;
+        cursor: pointer; pointer-events: auto; text-transform: uppercase; font-size: 12px;
+        transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      }
+      .sidebar-action-btn:hover { background: var(--danger); color: white; }
+
+      .sidebar-undo-btn {
+        background: var(--bg-panel); border: 1px solid #aaa; color: #aaa;
+        padding: 8px; border-radius: 6px; font-weight: 600; width: 100%; text-align: center;
+        cursor: pointer; pointer-events: auto; text-transform: uppercase; font-size: 11px;
+        transition: all 0.2s;
+      }
+      .sidebar-undo-btn:hover { background: #333; color: white; border-color: white; }
 
       .input-group { margin-bottom: 10px; }
       .input-group label { display: block; font-size: 12px; margin-bottom: 4px; color: #aaa; }
       .input-group input, .input-group select { width: 100%; box-sizing: border-box; }
+      
+      .severity-btn-group { display: flex; flex-direction: column; gap: 5px; }
+      .severity-btn {
+        text-align: left; padding: 10px; border: 1px solid #444; background: #333;
+        font-size: 12px; color: #ccc;
+      }
+      .severity-btn:hover { background: #444; }
+      .severity-btn.active { border-color: var(--success); background: rgba(46, 160, 67, 0.2); color: white; font-weight: 600; }
+
+      .preset-grid { display: flex; flex-direction: column; gap: 6px; }
+      button.preset-btn { 
+        width: 100%; text-align: left; background: #2d2d2d; border: 1px solid #3e3e42;
+        padding: 10px; font-weight: 500; display: flex; justify-content: space-between; align-items: center;
+      }
+      button.preset-btn:hover { background: #383838; border-color: #555; transform: translateX(2px); }
+      button.preset-btn::after { content: '›'; color: #666; font-weight: bold; }
 
       /* Bottom Bar */
       .bottom-bar {
-        position: absolute; bottom: 20px; left: 320px; right: 20px;
+        position: absolute; bottom: 20px; left: 360px; right: 20px;
         background: var(--bg-panel); border: 1px solid var(--border);
         border-radius: 6px; padding: 10px 20px;
         display: flex; align-items: center; gap: 20px;
-        pointer-events: auto;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        flex-wrap: wrap;
+        pointer-events: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3); flex-wrap: wrap;
       }
       .tool-section { display: flex; gap: 8px; align-items: center; }
       .tool-label { font-size: 11px; color: #666; font-weight: 600; margin-right: 8px; text-transform: uppercase; }
@@ -123,6 +178,7 @@
       }
       #context-menu.visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
 
+      /* Modals / Notification */
       #notification {
         position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
         background: var(--danger); color: white; padding: 10px 20px; border-radius: 4px;
@@ -131,14 +187,32 @@
       }
       #notification.visible { opacity: 1; }
 
+      #modal-overlay {
+        position: absolute; inset: 0; background: rgba(0,0,0,0.7); z-index: 3000;
+        display: none; align-items: center; justify-content: center; pointer-events: auto;
+      }
+      #modal-overlay.active { display: flex; }
+      .modal-box {
+        background: var(--bg-panel); width: 500px; padding: 25px; border-radius: 8px;
+        border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      }
+      .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: white; border-bottom: 1px solid #444; padding-bottom: 10px; }
+      .modal-content { color: #ccc; line-height: 1.6; margin-bottom: 20px; max-height: 60vh; overflow-y: auto; }
+
+      .report-item { 
+        background: rgba(255,255,255,0.05); padding: 12px; margin-bottom: 8px; border-radius: 4px; border-left: 4px solid #555;
+      }
+      .report-item.good { border-left-color: var(--success); }
+      .report-item.warn { border-left-color: var(--warning); }
+      .report-item.bad { border-left-color: var(--danger); }
+      .report-val { font-weight: bold; color: white; float: right; }
+
       #loader {
         position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        transition: opacity 0.3s;
-        opacity: 0; pointer-events: none; /* Hidden by default */
+        transition: opacity 0.3s; opacity: 0; pointer-events: none;
       }
       #loader.active { opacity: 1; pointer-events: auto; }
-      
       .spinner {
         width: 30px; height: 30px; border: 3px solid #333; border-top: 3px solid var(--primary);
         border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 15px;
@@ -150,16 +224,25 @@
     
     <div id="loader">
       <div class="spinner"></div>
-      <div id="loading-text" style="color:#ddd; font-size: 14px; font-weight:500;">Lade...</div>
+      <div id="loading-text" style="color:#ddd;">Lade...</div>
     </div>
     
     <div id="notification"></div>
 
+    <div id="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-title" id="modal-title">Titel</div>
+        <div class="modal-content" id="modal-content">Inhalt</div>
+        <button class="primary" style="width:100%" onclick="document.getElementById('modal-overlay').classList.remove('active')">Schließen</button>
+      </div>
+    </div>
+
+    <input type="file" id="file-input" style="display:none" accept=".json" onchange="app.loadFromFile(this)">
+
     <div id="ui-layer">
       <!-- Top Navigation -->
       <div class="top-bar">
-        <div class="brand">ELMeKS.digital Raumplaner</div>
-        
+        <div class="brand">ELMeKS.digital</div>
         <select id="room-select">
           <option value="raummodell_leer.glb" selected>LLR (50m²)</option>
           <option value="LLR_möbliert(50qm).obj">LLR möbliert (50m²)</option>
@@ -168,15 +251,27 @@
         </select>
         
         <div class="separator"></div>
+        <button onclick="app.savePlan()">Speichern</button>
+        <button onclick="document.getElementById('file-input').click()">Laden</button>
+        <button onclick="app.exportPDF()">PDF Export</button>
         
-        <span class="label-small">Kameraposition:</span>
-        <button onclick="app.setCamera('standard')">Standard</button>
-        <button onclick="app.setCamera('top')">Grundriss</button>
-        <button onclick="app.setCamera('corner')">Isometrisch</button>
         <div class="separator"></div>
-        <button onclick="app.takeScreenshot()">Export Bild</button>
+        <span style="font-size:11px; color:#888;">KAMERA:</span>
+        <button onclick="app.setCamera('top')">Kamera zurücksetzen</button>
+        <button onclick="app.setCamera('student')">Lernendenperspektive</button>
 
-        <div class="stats">
+        <div class="spacer"></div>
+
+        <!-- Prüfungen Dropdown -->
+        <div class="dropdown">
+          <button class="primary" style="min-width: 150px;">Prüfung der Barrierefreiheit ▼</button>
+          <div class="dropdown-content">
+             <button onclick="app.checkWheelchair()">Rollstuhlfreiheit</button>
+             <button id="vision-btn" onclick="app.toggleVisionMode()">Einschätzung Sehbeeinträchtigung</button>
+          </div>
+        </div>
+
+        <div class="stats" style="margin-left:15px;">
           <span>Plätze:</span>
           <span class="badge" id="seat-count">0</span>
         </div>
@@ -185,48 +280,70 @@
       <!-- Left Sidebar -->
       <div class="sidebar">
         
-        <!-- Panel 1: Assistent -->
-        <div class="panel">
-          <div class="panel-header">Planungs-Assistent</div>
-          
-          <div class="input-group">
-            <label>Szenario</label>
-            <select id="wizard-scenario">
-              <option value="lecture">Plenum (Reihen)</option>
-              <option value="group">Gruppenarbeit (6er)</option>
-              <option value="circle">Stuhlkreis</option>
-              <option value="exam">Klausur (Einzeln)</option>
-            </select>
-          </div>
-
-          <div class="input-group">
-            <label>Personenanzahl (Ziel)</label>
-            <input type="number" id="wizard-count" value="20" min="1" max="60" style="background:#333; color:white; border:1px solid #444; padding:6px; border-radius:4px;">
-          </div>
-
-          <button class="primary full-width" style="width:100%" onclick="app.runWizard()">Vorschlag generieren</button>
-        </div>
-
-        <!-- Panel 2: Manuelle Konstellationen -->
-        <div class="panel">
-          <div class="panel-header">Manuelle Konstellationen</div>
-          <div class="preset-grid">
-            <button class="preset-btn" onclick="app.addFurniture('k1')">2er Ecktisch</button>
-            <button class="preset-btn" onclick="app.addFurniture('k2')">2er Vis-a-Vis</button>
-            <button class="preset-btn" onclick="app.addFurniture('k5')">4er Ecktisch</button>
-            <button class="preset-btn" onclick="app.addFurniture('k6')">6er Gruppentisch</button>
-            <button class="preset-btn" onclick="app.addFurniture('k4')">8er Kreis (offen)</button>
-            <button class="preset-btn" onclick="app.addFurniture('k3')">8er Gruppentisch</button>
-            <button class="preset-btn" onclick="app.addFurniture('k8')">9er U-Form (Spitz)</button>
-            <button class="preset-btn" onclick="app.addFurniture('k7')">11er U-Form</button>
+        <!-- Vision Panel -->
+        <div class="panel" id="vision-panel" style="display:none; border-color: #2ea043;">
+          <div class="panel-header" style="background: #2ea043; color:white; pointer-events:none;">Seh-Simulation Aktiv</div>
+          <div class="panel-content">
+            <button class="danger solid full-width" style="width:100%; margin-bottom: 15px;" onclick="app.toggleVisionMode()">Simulation beenden</button>
+            <p style="font-size:12px; margin-bottom:10px; color:#ddd;">
+              Klicken Sie in den Raum, um den Marker zu platzieren oder halten Sie die Maus gedrückt, um ihn zu verschieben.
+            </p>
+            <div class="input-group">
+              <label>Ausprägungsgrad</label>
+              <div class="severity-btn-group">
+                <button class="severity-btn" onclick="app.setVisionSeverity('normal', this)">Normal (Visus > 0.3)</button>
+                <button class="severity-btn" onclick="app.setVisionSeverity('low', this)">Sehbehindert (Visus < 0.3)</button>
+                <button class="severity-btn" onclick="app.setVisionSeverity('severe', this)">Hochgradig (Visus < 0.05)</button>
+                <button class="severity-btn active" onclick="app.setVisionSeverity('blind', this)">Blindheit (Visus < 0.02)</button>
+              </div>
+            </div>
+            <div class="report-item" id="vision-info-box" style="margin-top:10px;">
+              <small>Simuliert den Wahrnehmungsbereich.</small>
+            </div>
           </div>
         </div>
 
-        <!-- Panel 3: Aktionen -->
+        <!-- Assistent -->
         <div class="panel">
-          <div class="panel-header">Aktionen</div>
-          <button class="danger full-width" style="width:100%" onclick="app.clearRoom()">Raum leeren</button>
+          <div class="panel-header" onclick="togglePanel(this)">Planungs-Assistent</div>
+          <div class="panel-content">
+            <div class="input-group">
+              <label>Szenario</label>
+              <select id="wizard-scenario">
+                <option value="lecture">Plenum (Reihen)</option>
+                <option value="group">Gruppenarbeit (6er)</option>
+                <option value="circle">Stuhlkreis</option>
+                <option value="exam">Klausur (Einzeln)</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Personenanzahl</label>
+              <input type="number" id="wizard-count" value="20" min="1" max="60" style="background:#333; color:white; border:1px solid #444; padding:6px; border-radius:4px;">
+            </div>
+            <button class="primary full-width" style="width:100%" onclick="app.runWizard()">Vorschlag generieren</button>
+          </div>
         </div>
+
+        <!-- Manuelle Konstellationen -->
+        <div class="panel collapsed">
+          <div class="panel-header" onclick="togglePanel(this)">Manuelle Konstellationen</div>
+          <div class="panel-content">
+            <div class="preset-grid">
+              <button class="preset-btn" onclick="app.addFurniture('k1')">2er Ecktisch</button>
+              <button class="preset-btn" onclick="app.addFurniture('k2')">2er Vis-a-Vis</button>
+              <button class="preset-btn" onclick="app.addFurniture('k5')">4er Ecktisch</button>
+              <button class="preset-btn" onclick="app.addFurniture('k6')">6er Gruppentisch</button>
+              <button class="preset-btn" onclick="app.addFurniture('k4')">8er Kreis (offen)</button>
+              <button class="preset-btn" onclick="app.addFurniture('k3')">8er Gruppentisch</button>
+              <button class="preset-btn" onclick="app.addFurniture('k8')">9er U-Form (Spitz)</button>
+              <button class="preset-btn" onclick="app.addFurniture('k7')">11er U-Form</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="sidebar-action-btn" onclick="app.clearRoom()">Raum leeren</button>
+        <button class="sidebar-undo-btn" onclick="app.undo()" style="margin-top:5px;">⟲ Rückgängig</button>
+
       </div>
 
       <!-- Context Menu -->
@@ -238,7 +355,7 @@
       </div>
 
       <!-- Bottom Bar -->
-      <div class="bottom-bar">
+      <div class="bottom-bar" id="bottom-bar">
         <div class="tool-section">
           <div class="tool-label">Möbel</div>
           <button onclick="app.addFurniture('row_combo')">Tisch+Stuhl</button>
