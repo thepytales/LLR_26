@@ -43,14 +43,33 @@
         font-size: 14px;
       }
       
-      canvas { display: block; width: 100vw; height: 100vh; outline: none; }
+      canvas { 
+        display: block; width: 100vw; height: 100vh; outline: none; 
+        position: absolute; top: 0; left: 0; z-index: 0;
+      }
+      body.filter-grayscale canvas { filter: grayscale(100%); }
+      body.filter-sepia canvas { filter: sepia(100%); }
+      body.filter-invert canvas { filter: invert(100%); }
+      
+      body.high-contrast {
+        --bg-dark: #000000;
+        --bg-panel: #000000;
+        --border: #ffffff;
+        --primary: #ffff00;
+        --text: #ffffff;
+        --text-light: #ffffff;
+        --btn-bg: #000000;
+      }
+      body.high-contrast button { border: 2px solid white; color: white; font-weight:bold; }
+      body.high-contrast button.primary { background: #ffff00; color: #000000 !important; border-color: #ffff00; }
+      body.high-contrast button:hover { background: #333; color: white !important; }
+      body.high-contrast button.primary:hover { background: #cccc00; color: black !important; }
       
       #ui-layer { 
-        position: absolute; inset: 0; pointer-events: none; 
+        position: absolute; inset: 0; pointer-events: none; z-index: 10;
         display: flex; flex-direction: column; justify-content: space-between;
       }
       
-      /* Top Bar */
       .top-bar {
         background: var(--bg-panel); height: 50px;
         display: flex; align-items: center; padding: 0 20px;
@@ -76,7 +95,6 @@
       button.danger.solid { background: var(--danger); color: white; }
       button.active { background: var(--primary); border-color: var(--text-light); color: white; }
 
-      /* Top Bar Dropdown */
       .dropdown { position: relative; display: inline-block; }
       .dropdown-content {
         display: none; position: absolute; right: 0; top: 100%;
@@ -92,9 +110,8 @@
       .dropdown-content button:last-child { border-bottom: none; }
       .dropdown-content button:hover { background: var(--btn-hover); }
 
-      /* Sidebar */
       .sidebar {
-        position: absolute; top: 70px; left: 20px; bottom: 80px; width: 320px;
+        position: absolute; top: 70px; left: 20px; bottom: 20px; width: 340px;
         display: flex; flex-direction: column; gap: 10px; pointer-events: none;
         overflow-y: auto; padding-right: 5px;
       }
@@ -104,7 +121,7 @@
       .panel {
         background: var(--bg-panel); border: 1px solid var(--border);
         border-radius: 6px; pointer-events: auto; overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3); flex-shrink: 0;
       }
       .panel-header {
         padding: 12px 15px; font-size: 12px; text-transform: uppercase; 
@@ -116,14 +133,14 @@
       .panel-header::after { content: '▼'; font-size: 10px; transition: transform 0.3s; }
       .panel.collapsed .panel-header::after { transform: rotate(-90deg); }
       
-      .panel-content { padding: 15px; transition: max-height 0.3s ease-out; max-height: 600px; overflow: visible; }
+      .panel-content { padding: 15px; transition: max-height 0.3s ease-out; max-height: 600px; overflow-y: auto; overflow-x: hidden; }
       .panel.collapsed .panel-content { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; opacity: 0; }
 
       .sidebar-action-btn {
         background: var(--bg-panel); border: 1px solid var(--danger); color: var(--danger);
         padding: 12px; border-radius: 6px; font-weight: 600; width: 100%; text-align: center;
         cursor: pointer; pointer-events: auto; text-transform: uppercase; font-size: 12px;
-        transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); margin-top: 10px;
       }
       .sidebar-action-btn:hover { background: var(--danger); color: white; }
 
@@ -137,7 +154,7 @@
 
       .input-group { margin-bottom: 10px; }
       .input-group label { display: block; font-size: 12px; margin-bottom: 4px; color: #aaa; }
-      .input-group input, .input-group select { width: 100%; box-sizing: border-box; }
+      .input-group input, .input-group select, .input-group textarea { width: 100%; box-sizing: border-box; background: #333; color: white; border: 1px solid #444; padding: 6px; border-radius: 4px;}
       
       .severity-btn-group { display: flex; flex-direction: column; gap: 5px; }
       .severity-btn {
@@ -147,26 +164,23 @@
       .severity-btn:hover { background: #444; }
       .severity-btn.active { border-color: var(--success); background: rgba(46, 160, 67, 0.2); color: white; font-weight: 600; }
 
-      .preset-grid { display: flex; flex-direction: column; gap: 6px; }
+      .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
       button.preset-btn { 
         width: 100%; text-align: left; background: #2d2d2d; border: 1px solid #3e3e42;
-        padding: 10px; font-weight: 500; display: flex; justify-content: space-between; align-items: center;
+        padding: 10px; font-weight: 500; white-space: normal; font-size: 11px;
       }
-      button.preset-btn:hover { background: #383838; border-color: #555; transform: translateX(2px); }
-      button.preset-btn::after { content: '›'; color: #666; font-weight: bold; }
+      button.preset-btn:hover { background: #383838; border-color: #555; }
 
-      /* Bottom Bar */
-      .bottom-bar {
-        position: absolute; bottom: 20px; left: 360px; right: 20px;
-        background: var(--bg-panel); border: 1px solid var(--border);
-        border-radius: 6px; padding: 10px 20px;
-        display: flex; align-items: center; gap: 20px;
-        pointer-events: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3); flex-wrap: wrap;
+      .item-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .item-grid button { text-align: center; padding: 12px 5px; background: #2d2d2d; border: 1px solid #3e3e42; }
+      .item-grid button:hover { background: #383838; border-color: #777; }
+
+      .object-list-item { 
+        padding: 6px; background: rgba(255,255,255,0.05); margin-bottom: 4px; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; justify-content: space-between;
       }
-      .tool-section { display: flex; gap: 8px; align-items: center; }
-      .tool-label { font-size: 11px; color: #666; font-weight: 600; margin-right: 8px; text-transform: uppercase; }
+      .object-list-item:hover { background: rgba(255,255,255,0.1); }
+      .object-list-item.selected { border: 1px solid var(--primary); background: rgba(0, 122, 204, 0.2); }
 
-      /* Context Menu */
       #context-menu {
         position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
         background: var(--bg-panel); padding: 8px 16px; border-radius: 30px;
@@ -175,10 +189,100 @@
         box-shadow: 0 10px 40px rgba(0,0,0,0.5);
         opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
         transform: translateX(-50%) translateY(10px);
+        z-index: 1500;
       }
       #context-menu.visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
 
-      /* Modals / Notification */
+      /* === NEUES ON-SCREEN CONTROLS DESIGN (Gaming Pad) === */
+      #onscreen-controls {
+        display: none; /* Wird per JS aktiviert */
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 180px;
+        height: 180px;
+        pointer-events: none; /* Damit man durch leere Bereiche klicken kann */
+        z-index: 2000;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #onscreen-controls.visible {
+        display: flex;
+      }
+
+      /* Container für das Steuerkreuz */
+      .d-pad {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        background: rgba(30, 30, 30, 0.8);
+        border-radius: 50%;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        pointer-events: auto;
+        border: 1px solid #444;
+      }
+
+      /* Allgemeine Button Styles */
+      .ctrl-btn {
+        position: absolute;
+        background: transparent;
+        border: none;
+        color: #ccc;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.1s;
+      }
+
+      .ctrl-btn:active {
+        color: #007acc;
+        transform: scale(0.9);
+      }
+
+      /* Positionierung im Kreis */
+      .btn-up    { top: 5px; left: 50%; transform: translateX(-50%); width: 40px; height: 35px; }
+      .btn-down  { bottom: 5px; left: 50%; transform: translateX(-50%); width: 40px; height: 35px; }
+      .btn-left  { left: 5px; top: 50%; transform: translateY(-50%); width: 35px; height: 40px; }
+      .btn-right { right: 5px; top: 50%; transform: translateY(-50%); width: 35px; height: 40px; }
+      .btn-center { 
+        top: 50%; left: 50%; transform: translate(-50%, -50%); 
+        width: 40px; height: 40px; background: #333; border-radius: 50%; border: 1px solid #555; 
+      }
+
+      /* Zoom & Tilt Leisten (Außerhalb des Kreises) */
+      .extra-controls {
+        pointer-events: auto;
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .pill-group {
+        display: flex;
+        background: rgba(30, 30, 30, 0.8);
+        border-radius: 20px;
+        border: 1px solid #444;
+        overflow: hidden;
+      }
+
+      .pill-btn {
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 14px;
+        border-right: 1px solid #444;
+      }
+      .pill-btn:last-child { border-right: none; }
+      .pill-btn:hover { background: #444; }
+      .pill-btn:active { background:var(--primary); }
+      /* ================================================= */
+
       #notification {
         position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
         background: var(--danger); color: white; padding: 10px 20px; border-radius: 4px;
@@ -187,17 +291,28 @@
       }
       #notification.visible { opacity: 1; }
 
-      #modal-overlay {
+      #modal-overlay, #settings-overlay {
         position: absolute; inset: 0; background: rgba(0,0,0,0.7); z-index: 3000;
         display: none; align-items: center; justify-content: center; pointer-events: auto;
       }
-      #modal-overlay.active { display: flex; }
+      #modal-overlay.active, #settings-overlay.active { display: flex; }
       .modal-box {
         background: var(--bg-panel); width: 500px; padding: 25px; border-radius: 8px;
         border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        max-height: 80vh; overflow-y: auto;
       }
-      .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: white; border-bottom: 1px solid #444; padding-bottom: 10px; }
-      .modal-content { color: #ccc; line-height: 1.6; margin-bottom: 20px; max-height: 60vh; overflow-y: auto; }
+      .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: white; border-bottom: 1px solid #444; padding-bottom: 10px; display:flex; justify-content:space-between; }
+      .modal-content { color: #ccc; line-height: 1.6; margin-bottom: 20px; }
+
+      .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+      .setting-row label { color: white; font-size: 14px; }
+
+      .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 20px; }
+      .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+      input:checked + .slider { background-color: var(--primary); }
+      input:checked + .slider:before { transform: translateX(20px); }
 
       .report-item { 
         background: rgba(255,255,255,0.05); padding: 12px; margin-bottom: 8px; border-radius: 4px; border-left: 4px solid #555;
@@ -229,11 +344,61 @@
     
     <div id="notification"></div>
 
+    <!-- Generic Modal -->
     <div id="modal-overlay">
       <div class="modal-box">
         <div class="modal-title" id="modal-title">Titel</div>
         <div class="modal-content" id="modal-content">Inhalt</div>
         <button class="primary" style="width:100%" onclick="document.getElementById('modal-overlay').classList.remove('active')">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-overlay">
+      <div class="modal-box" style="width: 500px;">
+        <div class="modal-title">
+          <span>Einstellungen</span>
+          <button style="background:none; border:none; color:white; font-size:1.2em; cursor:pointer;" onclick="app.toggleSettings()">✕</button>
+        </div>
+        
+        <div style="margin-bottom:20px; font-weight:bold; color:var(--primary);">Bedienung</div>
+        <div class="setting-row">
+          <label>Erweiterte Steuerung (Tastatur & Buttons)</label>
+          <label class="switch"><input type="checkbox" id="set-controls" onchange="app.updateSettings()"><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <label>Maus-Empfindlichkeit</label>
+          <input type="range" id="set-rotate-speed" min="0.1" max="2.0" step="0.1" value="1.0" onchange="app.updateSettings()" style="width:100px;">
+        </div>
+        <div class="setting-row">
+          <label>Reduzierte Bewegung (Keine Animation)</label>
+          <label class="switch"><input type="checkbox" id="set-reduced-motion" onchange="app.updateSettings()"><span class="slider"></span></label>
+        </div>
+
+        <div style="margin-bottom:20px; margin-top:20px; font-weight:bold; color:var(--primary);">Darstellung</div>
+        <div class="setting-row">
+          <label>Hochkontrast-Modus</label>
+          <label class="switch"><input type="checkbox" id="set-high-contrast" onchange="app.updateSettings()"><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <label>Schriftgröße</label>
+          <div>
+            <button onclick="app.setFontScale(-0.1)" style="padding:2px 8px;">A-</button>
+            <span id="font-scale-val" style="margin:0 10px;">100%</span>
+            <button onclick="app.setFontScale(0.1)" style="padding:2px 8px;">A+</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>Farbfilter</label>
+          <select id="set-color-filter" onchange="app.updateSettings()" style="width:auto;">
+            <option value="none">Keiner</option>
+            <option value="grayscale">Graustufen</option>
+            <option value="sepia">Sepia</option>
+            <option value="invert">Invertiert</option>
+          </select>
+        </div>
+
+        <button class="primary" style="width:100%; margin-top:10px;" onclick="app.toggleSettings()">Schließen</button>
       </div>
     </div>
 
@@ -256,7 +421,7 @@
         <button onclick="app.exportPDF()">PDF Export</button>
         
         <div class="separator"></div>
-        <span style="font-size:11px; color:#888;">KAMERA:</span>
+        <span style="font-size:0.9em; color:#888;">KAMERA:</span>
         <button onclick="app.setCamera('top')">Kamera zurücksetzen</button>
         <button onclick="app.setCamera('student')">Lernendenperspektive</button>
 
@@ -266,10 +431,13 @@
         <div class="dropdown">
           <button class="primary" style="min-width: 150px;">Prüfung der Barrierefreiheit ▼</button>
           <div class="dropdown-content">
-             <button onclick="app.checkWheelchair()">Rollstuhlfreiheit</button>
+             <button onclick="app.checkAccessibility()">Barrierefreiheit & Akustik</button>
              <button id="vision-btn" onclick="app.toggleVisionMode()">Einschätzung Sehbeeinträchtigung</button>
           </div>
         </div>
+
+        <!-- Settings Button -->
+        <button onclick="app.toggleSettings()" style="margin-left: 10px; padding: 6px 10px;">⚙️</button>
 
         <div class="stats" style="margin-left:15px;">
           <span>Plätze:</span>
@@ -280,12 +448,12 @@
       <!-- Left Sidebar -->
       <div class="sidebar">
         
-        <!-- Vision Panel -->
+        <!-- Vision Panel (Aktiv bei Seh-Modus) -->
         <div class="panel" id="vision-panel" style="display:none; border-color: #2ea043;">
           <div class="panel-header" style="background: #2ea043; color:white; pointer-events:none;">Seh-Simulation Aktiv</div>
           <div class="panel-content">
             <button class="danger solid full-width" style="width:100%; margin-bottom: 15px;" onclick="app.toggleVisionMode()">Simulation beenden</button>
-            <p style="font-size:12px; margin-bottom:10px; color:#ddd;">
+            <p style="font-size:0.9em; margin-bottom:10px; color:#ddd;">
               Klicken Sie in den Raum, um den Marker zu platzieren oder halten Sie die Maus gedrückt, um ihn zu verschieben.
             </p>
             <div class="input-group">
@@ -324,6 +492,26 @@
           </div>
         </div>
 
+        <!-- Einzelmöbel & Ausstattung -->
+        <div class="panel collapsed">
+          <div class="panel-header" onclick="togglePanel(this)">Einzelmöbel & Ausstattung</div>
+          <div class="panel-content">
+            <label style="color:#aaa; font-size:11px; display:block; margin-bottom:5px;">MÖBEL</label>
+            <div class="item-grid">
+              <button onclick="app.addFurniture('row_combo')">Tisch+Stuhl</button>
+              <button onclick="app.addFurniture('tano')">Tano-Tisch</button>
+              <button onclick="app.addFurniture('triangle')">Dreieck</button>
+              <button onclick="app.addFurniture('chair')">Stuhl</button>
+            </div>
+            <label style="color:#aaa; font-size:11px; display:block; margin-bottom:5px; margin-top:10px;">AUSSTATTUNG</label>
+            <div class="item-grid">
+              <button onclick="app.addFurniture('board')">Tafel</button>
+              <button onclick="app.addFurniture('teacher')">Pult</button>
+              <button onclick="app.addFurniture('cupboard')">Regal</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Manuelle Konstellationen -->
         <div class="panel collapsed">
           <div class="panel-header" onclick="togglePanel(this)">Manuelle Konstellationen</div>
@@ -341,6 +529,23 @@
           </div>
         </div>
 
+        <!-- Objektliste -->
+        <div class="panel collapsed">
+          <div class="panel-header" onclick="togglePanel(this)">Objektliste & Anmerkungen</div>
+          <div class="panel-content">
+            <div id="selection-details" style="display:none; border-bottom:1px solid #444; margin-bottom:10px; padding-bottom:10px;">
+                <label style="color:var(--primary); font-weight:bold;">Ausgewähltes Objekt</label>
+                <div class="input-group" style="margin-top:5px;">
+                    <label>Anmerkung (für PDF)</label>
+                    <textarea id="obj-annotation" rows="2" oninput="app.updateAnnotation(this.value)"></textarea>
+                </div>
+            </div>
+            <div id="object-list-container">
+               <small style="color:#888;">Keine Objekte im Raum.</small>
+            </div>
+          </div>
+        </div>
+
         <button class="sidebar-action-btn" onclick="app.clearRoom()">Raum leeren</button>
         <button class="sidebar-undo-btn" onclick="app.undo()" style="margin-top:5px;">⟲ Rückgängig</button>
 
@@ -354,25 +559,35 @@
         <button class="danger" onclick="app.deleteSelection()">Entfernen</button>
       </div>
 
-      <!-- Bottom Bar -->
-      <div class="bottom-bar" id="bottom-bar">
-        <div class="tool-section">
-          <div class="tool-label">Möbel</div>
-          <button onclick="app.addFurniture('row_combo')">Tisch+Stuhl</button>
-          <button onclick="app.addFurniture('tano')">Tano-Tisch</button>
-          <button onclick="app.addFurniture('triangle')">Dreieck</button>
-          <button onclick="app.addFurniture('chair')">Stuhl</button>
-        </div>
-        <div class="separator"></div>
-        <div class="tool-section">
-          <div class="tool-label">Ausstattung</div>
-          <button onclick="app.addFurniture('board')">Tafel</button>
-          <button onclick="app.addFurniture('teacher')">Pult</button>
-          <button onclick="app.addFurniture('cupboard')">Regal</button>
-        </div>
+      <!-- On-Screen Controls (Modernes Design) -->
+      <div id="onscreen-controls">
+          <!-- Steuerkreuz für Bewegung (Pan) -->
+          <div class="d-pad">
+              <button class="ctrl-btn btn-up" onclick="app.moveCamera(0, 1)" title="Vorwärts">▲</button>
+              <button class="ctrl-btn btn-left" onclick="app.moveCamera(1, 0)" title="Links">◀</button>
+              <button class="ctrl-btn btn-center" onclick="app.setCamera('top')" title="Reset">↺</button>
+              <button class="ctrl-btn btn-right" onclick="app.moveCamera(-1, 0)" title="Rechts">▶</button>
+              <button class="ctrl-btn btn-down" onclick="app.moveCamera(0, -1)" title="Rückwärts">▼</button>
+          </div>
+
+          <!-- Zoom und Kippen -->
+          <div class="extra-controls">
+              <!-- Zoom -->
+              <div class="pill-group">
+                  <button class="pill-btn" onclick="app.zoomCamera(-1)" title="Zoom In">+</button>
+                  <button class="pill-btn" onclick="app.zoomCamera(1)" title="Zoom Out">-</button>
+              </div>
+              <!-- Kippen (Tilt) -->
+              <div class="pill-group">
+                  <button class="pill-btn" onclick="app.tiltCamera(1)" title="Kippen Hoch">⇧</button>
+                  <button class="pill-btn" onclick="app.tiltCamera(-1)" title="Kippen Runter">⇩</button>
+              </div>
+          </div>
       </div>
+
     </div>
 
     <script type="module" src="script.js"></script>
   </body>
 </html>
+
